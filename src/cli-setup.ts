@@ -5,9 +5,8 @@ import { version } from '../package.json'
 import { configMcp } from './commands/config-mcp'
 import { diagnoseMcp, fixMcp } from './commands/diagnose-mcp'
 import { init } from './commands/init'
-import { showMainMenu } from './commands/menu'
+import { configApi, showMainMenu } from './commands/menu'
 import { i18n, initI18n } from './i18n'
-import { readCcgConfig } from './utils/config'
 
 function customizeHelp(sections: any[]): any[] {
   sections.unshift({
@@ -19,8 +18,10 @@ function customizeHelp(sections: any[]): any[] {
     title: ansis.yellow(i18n.t('cli:help.commands')),
     body: [
       `  ${ansis.cyan('yq')}               ${i18n.t('cli:help.commandDescriptions.showMenu')}`,
+      `  ${ansis.cyan('yq menu')}          ${i18n.t('cli:help.commandDescriptions.showMenu')}`,
       `  ${ansis.cyan('yq init')} | ${ansis.cyan('i')}      ${i18n.t('cli:help.commandDescriptions.initConfig')}`,
       `  ${ansis.cyan('yq config mcp')}    ${i18n.t('cli:help.commandDescriptions.configMcp')}`,
+      `  ${ansis.cyan('yq config api')}    配置 API 端点`,
       `  ${ansis.cyan('yq diagnose-mcp')}  ${i18n.t('cli:help.commandDescriptions.diagnoseMcp')}`,
       `  ${ansis.cyan('yq fix-mcp')}       ${i18n.t('cli:help.commandDescriptions.fixMcp')}`,
       '',
@@ -32,7 +33,6 @@ function customizeHelp(sections: any[]): any[] {
   sections.push({
     title: ansis.yellow(i18n.t('cli:help.options')),
     body: [
-      `  ${ansis.green('--lang, -l')} <lang>         ${i18n.t('cli:help.optionDescriptions.displayLanguage')} (zh-CN, en)`,
       `  ${ansis.green('--force, -f')}               ${i18n.t('cli:help.optionDescriptions.forceOverwrite')}`,
       `  ${ansis.green('--help, -h')}                ${i18n.t('cli:help.optionDescriptions.displayHelp')}`,
       `  ${ansis.green('--version, -v')}             ${i18n.t('cli:help.optionDescriptions.displayVersion')}`,
@@ -66,9 +66,7 @@ function customizeHelp(sections: any[]): any[] {
 
 export async function setupCommands(cli: CAC): Promise<void> {
   try {
-    const config = await readCcgConfig()
-    const defaultLang = config?.general?.language || 'zh-CN'
-    await initI18n(defaultLang)
+    await initI18n('zh-CN')
   }
   catch {
     await initI18n('zh-CN')
@@ -76,27 +74,25 @@ export async function setupCommands(cli: CAC): Promise<void> {
 
   cli
     .command('', i18n.t('cli:help.commandDescriptions.showMenu'))
-    .option('--lang, -l <lang>', `${i18n.t('cli:help.optionDescriptions.displayLanguage')} (zh-CN, en)`)
-    .action(async (options: CliOptions) => {
-      if (options.lang) {
-        await initI18n(options.lang)
-      }
+    .action(async (_options: CliOptions) => {
+      await showMainMenu()
+    })
+
+  cli
+    .command('menu', i18n.t('cli:help.commandDescriptions.showMenu'))
+    .action(async () => {
       await showMainMenu()
     })
 
   cli
     .command('init', i18n.t('cli:help.commandDescriptions.initConfig'))
     .alias('i')
-    .option('--lang, -l <lang>', `${i18n.t('cli:help.optionDescriptions.displayLanguage')} (zh-CN, en)`)
     .option('--force, -f', i18n.t('cli:help.optionDescriptions.forceOverwrite'))
     .option('--skip-prompt, -s', i18n.t('cli:help.optionDescriptions.skipAllPrompts'))
     .option('--skip-mcp', 'Skip MCP configuration (used during update)')
     .option('--workflows, -w <workflows>', i18n.t('cli:help.optionDescriptions.workflows'))
     .option('--install-dir, -d <path>', i18n.t('cli:help.optionDescriptions.installDir'))
     .action(async (options: CliOptions) => {
-      if (options.lang) {
-        await initI18n(options.lang)
-      }
       await init(options)
     })
 
@@ -118,9 +114,12 @@ export async function setupCommands(cli: CAC): Promise<void> {
       if (subcommand === 'mcp') {
         await configMcp()
       }
+      else if (subcommand === 'api') {
+        await configApi()
+      }
       else {
         console.log(ansis.red(i18n.t('common:unknownSubcommand', { subcommand })))
-        console.log(ansis.gray(i18n.t('common:availableSubcommands', { list: 'mcp' })))
+        console.log(ansis.gray(i18n.t('common:availableSubcommands', { list: 'mcp, api' })))
       }
     })
 

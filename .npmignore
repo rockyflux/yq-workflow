@@ -1,0 +1,29 @@
+# Exclude development-only sources from npm package
+src/
+test/
+tests/
+*.test.ts
+*.spec.ts
+.github/
+
+# Local/editor files
+*.log
+*.swp
+*.swo
+*~
+.DS_Store
+.vscode
+.idea
+node_modules
+
+# Optional docs and workspace files
+WORKFLOW.md
+PATH_ISSUE_DIAGNOSIS.md
+.git
+.gitignore
+.gitattributes
+.gitlab-ci.yml
+tsconfig.json
+unbuild.config.ts
+build.config.ts
+pnpm-lock.yaml

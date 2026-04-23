@@ -1,11 +1,12 @@
 // 支持的语言
-export type SupportedLang = 'zh-CN' | 'en'
+export type SupportedLang = 'zh-CN'
 
 // YQ 配置
 export interface CcgConfig {
   general: {
     version: string
     language: SupportedLang
+    outputStyle?: string
     createdAt: string
   }
   workflows: {

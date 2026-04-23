@@ -1,0 +1,72 @@
+{
+  "name": "yq-workflow",
+  "version": "1.0.0",
+  "description": "YQ workflow toolkit for installing Claude Code command packs, prompts, and project helpers",
+  "type": "module",
+  "packageManager": "pnpm@10.17.1",
+  "author": {
+    "name": "YQ Contributors"
+  },
+  "license": "MIT",
+  "keywords": [
+    "claude",
+    "claude-code",
+    "ai",
+    "cli",
+    "workflow"
+  ],
+  "bin": {
+    "yq": "bin/yq.mjs",
+    "yq-workflow": "bin/yq.mjs"
+  },
+  "main": "dist/index.mjs",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.mts",
+  "files": [
+    "bin/yq.mjs",
+    "dist",
+    "templates/prompts/",
+    "templates/prompts/claude/",
+    "templates/output-styles/",
+    "templates/skills/",
+    "templates/rules/"
+  ],
+  "scripts": {
+    "dev": "tsx src/cli.ts",
+    "build": "unbuild",
+    "start": "node bin/yq.mjs",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "pnpm build",
+    "test": "vitest run",
+    "lint": "eslint",
+    "lint:fix": "eslint --fix",
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs"
+  },
+  "dependencies": {
+    "ansis": "^4.1.0",
+    "cac": "^6.7.14",
+    "fs-extra": "^11.3.2",
+    "i18next": "^25.5.2",
+    "i18next-fs-backend": "^2.6.0",
+    "inquirer": "^12.9.6",
+    "ora": "^9.0.0",
+    "pathe": "^2.0.3",
+    "smol-toml": "^1.4.2"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild"]
+  },
+  "devDependencies": {
+    "@antfu/eslint-config": "^5.4.1",
+    "@types/fs-extra": "^11.0.4",
+    "@types/node": "^22.0.0",
+    "eslint": "^9.36.0",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2",
+    "unbuild": "^3.6.1",
+    "vitepress": "^1.6.4",
+    "vitest": "^3.1.1"
+  }
+}
