@@ -10,7 +10,7 @@ import { init } from './init'
 import { update } from './update'
 import { buildDate } from '../generated/build-info'
 import { i18n } from '../i18n'
-import { getWorkflowConfigs, uninstallWorkflows } from '../utils/installer'
+import { collectSkills, getAgentSkillsDir, getWorkflowConfigs, uninstallWorkflows } from '../utils/installer'
 import { readCcgConfig, writeCcgConfig } from '../utils/config'
 import { PACKAGE_ROOT } from '../utils/installer-template'
 import { compareVersions, getGlobalPackageVersion, getLatestVersion } from '../utils/version'
@@ -78,6 +78,13 @@ const MENU_RESOURCES = [
 const HEADER_INNER_WIDTH = 60
 const CC_SWITCH_RELEASES_URL = 'https://github.com/farion1231/cc-switch/releases'
 
+type InstallStatus = {
+  isInstalled: boolean
+  installedVersion: string | null
+  currentVersion: string
+  needsUpdate: boolean
+}
+
 function getConfigFilePath(): string {
   return join(homedir(), '.claude', '.yq', 'config.toml')
 }
@@ -90,13 +97,14 @@ async function countInstalledCommands(): Promise<number> {
 }
 
 async function countInstalledSkills(): Promise<number> {
-  const [yqSkills, baseSkills, superpowersSkills] = await Promise.all([
+  const [workflowSkills, yqSkills, baseSkills, superpowersSkills] = await Promise.all([
+    listInstalledWorkflowSkills(),
     listInstalledYqAgentSkills(),
     listInstalledBaseSkills(),
     listInstalledSuperpowersSkills(),
   ])
 
-  return yqSkills.length + baseSkills.length + superpowersSkills.length
+  return workflowSkills.length + yqSkills.length + baseSkills.length + superpowersSkills.length
 }
 
 async function listInstalledCommands(): Promise<string[]> {
@@ -116,7 +124,7 @@ type InstalledSkill = {
 }
 
 async function listInstalledSkillsFromTemplate(templateSubdir: string, installSubdir: string): Promise<InstalledSkill[]> {
-  const agentSkillsDir = join(homedir(), '.agents', 'skills', installSubdir)
+  const agentSkillsDir = join(getAgentSkillsDir(), installSubdir)
   const templateDir = join(PACKAGE_ROOT, 'templates', templateSubdir)
 
   if (!(await fs.pathExists(agentSkillsDir)) || !(await fs.pathExists(templateDir))) {
@@ -139,6 +147,20 @@ async function listInstalledSkillsFromTemplate(templateSubdir: string, installSu
   }
 
   return installedSkills.sort((a, b) => a.name.localeCompare(b.name))
+}
+
+async function listInstalledWorkflowSkills(): Promise<InstalledSkill[]> {
+  const workflowSkillsDir = join(homedir(), '.claude', 'skills', 'yq')
+  if (!(await fs.pathExists(workflowSkillsDir))) {
+    return []
+  }
+
+  return collectSkills(workflowSkillsDir)
+    .map(skill => ({
+      name: skill.name,
+      path: skill.skillPath,
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name))
 }
 
 async function listInstalledYqAgentSkills(): Promise<InstalledSkill[]> {
@@ -168,6 +190,48 @@ function printInstalledSkillsSection(title: string, items: InstalledSkill[], emp
 
 function createHeaderLine(content = ''): string {
   return `║${content.padStart(Math.floor((HEADER_INNER_WIDTH + content.length) / 2)).padEnd(HEADER_INNER_WIDTH)}║`
+}
+
+async function getInstallStatus(commandCount: number): Promise<InstallStatus> {
+  const config = await readCcgConfig()
+  const installedVersion = config?.general?.version || null
+  const isInstalled = Boolean(installedVersion) && commandCount > 0
+  const needsUpdate = installedVersion !== null && compareVersions(version, installedVersion) !== 0
+
+  return {
+    isInstalled,
+    installedVersion,
+    currentVersion: version,
+    needsUpdate,
+  }
+}
+
+function printInstallStatus(status: InstallStatus): void {
+  console.log(ansis.cyan('  工作流状态'))
+
+  const installedVersion = status.installedVersion
+
+  if (!status.isInstalled || !installedVersion) {
+    console.log(ansis.gray('  未检测到已安装工作流，可先执行初始化 / 重装工作流'))
+    console.log()
+    return
+  }
+
+  console.log(`  已安装版本: ${ansis.yellow(`v${installedVersion}`)}`)
+
+  if (!status.needsUpdate) {
+    console.log(ansis.green(`  当前启动版本与已安装版本一致: v${status.currentVersion}`))
+    console.log()
+    return
+  }
+
+  const isCurrentNewer = compareVersions(status.currentVersion, installedVersion) > 0
+  const reminder = isCurrentNewer
+    ? `检测到已安装版本较旧，当前启动版本为 v${status.currentVersion}，建议执行 ${ansis.cyan('yq update')}`
+    : `检测到当前启动版本较旧，已安装版本为 v${installedVersion}，建议更新 CLI 或使用较新的 yq-workflow 版本`
+
+  console.log(ansis.yellow(`  更新提醒: ${reminder}`))
+  console.log()
 }
 
 function drawHeader(commandCount: number, skillCount: number): void {
@@ -205,18 +269,40 @@ function printMenuResources(): void {
   console.log()
 }
 
+function resolveInteractiveCommand(command: string, args: string[]): { command: string, args: string[] } {
+  if (process.platform !== 'win32') {
+    return { command, args }
+  }
+
+  if (command === 'start') {
+    return {
+      command: 'cmd',
+      args: ['/c', 'start', '', ...args],
+    }
+  }
+
+  if (['npm', 'npx'].includes(command)) {
+    return {
+      command: 'cmd',
+      args: ['/c', command, ...args],
+    }
+  }
+
+  return { command, args }
+}
+
 function runInteractiveCommand(command: string, args: string[]): Promise<void> {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, {
+    const resolved = resolveInteractiveCommand(command, args)
+    const child = spawn(resolved.command, resolved.args, {
       cwd: process.cwd(),
       stdio: 'inherit',
-      shell: true,
       env: process.env,
     })
 
     child.on('exit', code => {
       if (code === 0) resolve()
-      else reject(new Error(`${command} exited with code ${code ?? 'unknown'}`))
+      else reject(new Error(`${resolved.command} exited with code ${code ?? 'unknown'}`))
     })
     child.on('error', reject)
   })
@@ -477,8 +563,9 @@ async function installCodex(): Promise<void> {
 }
 
 async function showHelp(): Promise<void> {
-  const [installedCommands, installedSkills, installedBaseSkills, installedSuperpowers] = await Promise.all([
+  const [installedCommands, installedWorkflowSkills, installedSkills, installedBaseSkills, installedSuperpowers] = await Promise.all([
     listInstalledCommands(),
+    listInstalledWorkflowSkills(),
     listInstalledYqAgentSkills(),
     listInstalledBaseSkills(),
     listInstalledSuperpowersSkills(),
@@ -505,6 +592,7 @@ async function showHelp(): Promise<void> {
     }
   }
 
+  printInstalledSkillsSection('Workflow Skills', installedWorkflowSkills, '暂未发现已安装 workflow skills')
   printInstalledSkillsSection('Skills', installedSkills, '暂未发现已安装 yq-skills')
   printInstalledSkillsSection('Base Skills', installedBaseSkills, '暂未发现已安装 yq-base skills')
   printInstalledSkillsSection('Superpowers', installedSuperpowers, '暂未发现已安装 superpowers')
@@ -552,7 +640,9 @@ export async function showMainMenu(): Promise<void> {
       countInstalledCommands(),
       countInstalledSkills(),
     ])
+    const installStatus = await getInstallStatus(commandCount)
     drawHeader(commandCount, skillCount)
+    printInstallStatus(installStatus)
     printMenuResources()
 
     const { action } = await inquirer.prompt([{

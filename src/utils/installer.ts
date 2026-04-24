@@ -57,7 +57,7 @@ interface InstallContext {
   result: InstallResult
 }
 
-function getAgentSkillsDir(): string {
+export function getAgentSkillsDir(): string {
   return process.env.YQ_AGENT_SKILLS_DIR || join(homedir(), '.agents', 'skills')
 }
 

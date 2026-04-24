@@ -5,7 +5,7 @@ import { homedir } from 'node:os'
 import { join } from 'pathe'
 import { i18n, initI18n } from '../i18n'
 import { createDefaultConfig, readCcgConfig, writeCcgConfig } from '../utils/config'
-import { getAllCommandIds, installWorkflows, showInstallSummary } from '../utils/installer'
+import { getAgentSkillsDir, getAllCommandIds, installWorkflows, showInstallSummary } from '../utils/installer'
 
 export async function init(options: InitOptions = {}): Promise<void> {
   console.log()
@@ -73,13 +73,13 @@ export async function init(options: InitOptions = {}): Promise<void> {
     console.log(ansis.green(`  已安装 ${result.installedSkills} 个 Skills 到 ${join(installDir, 'skills', 'yq')}`))
   }
   if ((result.installedAgentSkills || 0) > 0) {
-    console.log(ansis.green(`  已安装 ${result.installedAgentSkills} 个 Agent Skills 到 ${join(homedir(), '.agents', 'skills', 'yq')}`))
+    console.log(ansis.green(`  已安装 ${result.installedAgentSkills} 个 Agent Skills 到 ${join(getAgentSkillsDir(), 'yq')}`))
   }
   if ((result.installedBaseSkills || 0) > 0) {
-    console.log(ansis.green(`  已安装 ${result.installedBaseSkills} 个 Base Skills 到 ${join(homedir(), '.agents', 'skills', 'yq-base')}`))
+    console.log(ansis.green(`  已安装 ${result.installedBaseSkills} 个 Base Skills 到 ${join(getAgentSkillsDir(), 'yq-base')}`))
   }
   if ((result.installedSuperpowers || 0) > 0) {
-    console.log(ansis.green(`  已安装 ${result.installedSuperpowers} 个 Superpowers Skills 到 ${join(homedir(), '.agents', 'skills', 'superpowers')}`))
+    console.log(ansis.green(`  已安装 ${result.installedSuperpowers} 个 Superpowers Skills 到 ${join(getAgentSkillsDir(), 'superpowers')}`))
   }
   console.log(ansis.gray(`  配置文件: ${join(installDir, '.yq', 'config.toml')}`))
   if (mcpProvider !== 'skip') {
