@@ -29,11 +29,14 @@
     "templates/prompts/claude/",
     "templates/output-styles/",
     "templates/skills/",
+    "templates/base-skills/",
+    "templates/superpowers/",
     "templates/yq-skills/",
     "templates/rules/"
   ],
   "scripts": {
     "dev": "tsx src/cli.ts",
+    "prebuild": "node scripts/generate-build-info.mjs",
     "build": "unbuild",
     "start": "node bin/yq.mjs",
     "typecheck": "tsc --noEmit",

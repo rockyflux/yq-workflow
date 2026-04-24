@@ -8,6 +8,7 @@ import { version } from '../../package.json'
 import { configMcp } from './config-mcp'
 import { init } from './init'
 import { update } from './update'
+import { buildDate } from '../generated/build-info'
 import { i18n } from '../i18n'
 import { getWorkflowConfigs, uninstallWorkflows } from '../utils/installer'
 import { readCcgConfig, writeCcgConfig } from '../utils/config'
@@ -63,6 +64,20 @@ const MANAGED_PACKAGES: ManagedPackage[] = [
   { label: 'CCometixLine', packageName: '@cometix/ccline' },
 ]
 
+const MENU_RESOURCES = [
+  {
+    label: 'AI 编程实践指南',
+    url: 'https://github.com/rockyflux/ai-guide',
+  },
+  {
+    label: '项目地址',
+    url: 'http://172.16.68.178:8090/vb-coding/yq-workflow',
+  },
+] as const
+
+const HEADER_INNER_WIDTH = 60
+const CC_SWITCH_RELEASES_URL = 'https://github.com/farion1231/cc-switch/releases'
+
 function getConfigFilePath(): string {
   return join(homedir(), '.claude', '.yq', 'config.toml')
 }
@@ -72,6 +87,16 @@ async function countInstalledCommands(): Promise<number> {
   if (!(await fs.pathExists(commandsDir))) return 0
   const files = await fs.readdir(commandsDir)
   return files.filter(file => file.endsWith('.md')).length
+}
+
+async function countInstalledSkills(): Promise<number> {
+  const [yqSkills, baseSkills, superpowersSkills] = await Promise.all([
+    listInstalledYqAgentSkills(),
+    listInstalledBaseSkills(),
+    listInstalledSuperpowersSkills(),
+  ])
+
+  return yqSkills.length + baseSkills.length + superpowersSkills.length
 }
 
 async function listInstalledCommands(): Promise<string[]> {
@@ -141,28 +166,41 @@ function printInstalledSkillsSection(title: string, items: InstalledSkill[], emp
   }
 }
 
-function drawHeader(commandCount: number): void {
+function createHeaderLine(content = ''): string {
+  return `║${content.padStart(Math.floor((HEADER_INNER_WIDTH + content.length) / 2)).padEnd(HEADER_INNER_WIDTH)}║`
+}
+
+function drawHeader(commandCount: number, skillCount: number): void {
   const lines = [
     '╔════════════════════════════════════════════════════════════╗',
-    '║                                                            ║',
-    '║                  ██╗   ██╗ ██████╗                         ║',
-    '║                  ╚██╗ ██╔╝██╔═══██╗                        ║',
-    '║                   ╚████╔╝ ██║   ██║                        ║',
-    '║                    ╚██╔╝  ██║▄▄ ██║                        ║',
-    '║                     ██║   ╚██████╔╝                        ║',
-    '║                     ╚═╝    ╚══▀▀═╝                         ║',
-    '║                                                            ║',
-    '║               Claude Code Workflow Toolkit                 ║',
-    '║                  Commands + Skills + MCP                   ║',
-    '║                                                            ║',
-    `║             v${version.padEnd(6)} | ${String(commandCount).padStart(2)} commands | zh-CN              ║`,
-    '║                                                            ║',
+    createHeaderLine(),
+    createHeaderLine('██╗   ██╗ ██████╗'),
+    createHeaderLine('╚██╗ ██╔╝██╔═══██╗'),
+    createHeaderLine(' ╚████╔╝ ██║   ██║'),
+    createHeaderLine('  ╚██╔╝  ██║▄▄ ██║'),
+    createHeaderLine('   ██║   ╚██████╔╝'),
+    createHeaderLine('   ╚═╝    ╚══▀▀═╝'),
+    createHeaderLine(),
+    createHeaderLine('Claude Code Workflow Toolkit'),
+    createHeaderLine('Commands + Skills + MCP'),
+    createHeaderLine(),
+    createHeaderLine(`v${version} | ${commandCount} commands | ${skillCount} skills | zh-CN`),
+    createHeaderLine(`build ${buildDate}`),
+    createHeaderLine(),
     '╚════════════════════════════════════════════════════════════╝',
   ]
 
   console.log()
   for (const line of lines) {
     console.log(ansis.cyan(line))
+  }
+  console.log()
+}
+
+function printMenuResources(): void {
+  console.log(ansis.cyan('  参考资源'))
+  for (const resource of MENU_RESOURCES) {
+    console.log(`  ${ansis.green(resource.label.padEnd(16))} ${ansis.gray(resource.url)}`)
   }
   console.log()
 }
@@ -186,73 +224,30 @@ function runInteractiveCommand(command: string, args: string[]): Promise<void> {
 
 async function configApi(): Promise<void> {
   console.log()
-  console.log(ansis.cyan.bold('  配置 Claude Code API'))
+  console.log(ansis.cyan.bold('  下载 API 配置工具'))
+  console.log()
+  console.log('  YQ 不再内置 API 配置逻辑。')
+  console.log(`  请手动下载 ${ansis.cyan('cc-switch')} 后完成 API 配置：`)
+  console.log(`  ${ansis.gray(CC_SWITCH_RELEASES_URL)}`)
   console.log()
 
-  const settingsPath = join(homedir(), '.claude', 'settings.json')
-  let settings: Record<string, any> = {}
-  if (await fs.pathExists(settingsPath)) {
-    settings = await fs.readJSON(settingsPath)
-  }
-  settings.env ||= {}
+  try {
+    if (process.platform === 'win32') {
+      await runInteractiveCommand('start', [CC_SWITCH_RELEASES_URL])
+    }
+    else if (process.platform === 'darwin') {
+      await runInteractiveCommand('open', [CC_SWITCH_RELEASES_URL])
+    }
+    else {
+      await runInteractiveCommand('xdg-open', [CC_SWITCH_RELEASES_URL])
+    }
 
-  const currentUrl = settings.env.ANTHROPIC_BASE_URL
-  const currentKey = settings.env.ANTHROPIC_AUTH_TOKEN || settings.env.ANTHROPIC_API_KEY
-
-  if (currentUrl || currentKey) {
-    console.log(ansis.gray('当前已存在自定义 API 配置'))
-    if (currentUrl) console.log(`  URL: ${ansis.cyan(currentUrl)}`)
-    if (currentKey) console.log(`  Key: ${ansis.cyan('********')}`)
-    console.log()
+    console.log(ansis.green('  已尝试打开下载页面'))
   }
-
-  const answers = await inquirer.prompt([{
-    type: 'list',
-    name: 'provider',
-    message: '选择 API 提供方',
-    choices: [
-      { name: 'Anthropic 官方 / 清除自定义配置', value: 'official' },
-      { name: '第三方 API 代理', value: 'third-party' },
-      { name: '302.AI', value: '302ai' },
-    ],
-    default: 'official',
-  }, {
-    type: 'input',
-    name: 'url',
-    message: 'API URL',
-    when: (input: { provider: string }) => input.provider === 'third-party',
-    validate: (value: string) => value.trim() !== '' || '请输入 API URL',
-  }, {
-    type: 'password',
-    name: 'key',
-    message: 'API Key',
-    mask: '*',
-    when: (input: { provider: string }) => input.provider === 'third-party' || input.provider === '302ai',
-    validate: (value: string) => value.trim() !== '' || '请输入 API Key',
-  }] as any)
-
-  if (answers.provider === 'official') {
-    delete settings.env.ANTHROPIC_BASE_URL
-    delete settings.env.ANTHROPIC_AUTH_TOKEN
-    delete settings.env.ANTHROPIC_API_KEY
-  }
-  else if (answers.provider === '302ai') {
-    settings.env.ANTHROPIC_BASE_URL = 'https://api.302.ai/cc'
-    settings.env.ANTHROPIC_AUTH_TOKEN = answers.key.trim()
-    delete settings.env.ANTHROPIC_API_KEY
-  }
-  else {
-    settings.env.ANTHROPIC_BASE_URL = answers.url.trim()
-    settings.env.ANTHROPIC_AUTH_TOKEN = answers.key.trim()
-    delete settings.env.ANTHROPIC_API_KEY
+  catch {
+    console.log(ansis.yellow('  未能自动打开浏览器，请手动访问上面的链接'))
   }
 
-  await fs.ensureDir(join(homedir(), '.claude'))
-  await fs.writeJSON(settingsPath, settings, { spaces: 2 })
-
-  console.log()
-  console.log(ansis.green('  API 配置已保存'))
-  console.log(ansis.gray(`  ${settingsPath}`))
   console.log()
 }
 
@@ -553,8 +548,12 @@ async function uninstall(): Promise<void> {
 
 export async function showMainMenu(): Promise<void> {
   while (true) {
-    const commandCount = await countInstalledCommands()
-    drawHeader(commandCount)
+    const [commandCount, skillCount] = await Promise.all([
+      countInstalledCommands(),
+      countInstalledSkills(),
+    ])
+    drawHeader(commandCount, skillCount)
+    printMenuResources()
 
     const { action } = await inquirer.prompt([{
       type: 'list',
@@ -566,7 +565,7 @@ export async function showMainMenu(): Promise<void> {
         { name: '1. 初始化 / 重装工作流      - 安装 YQ 工作流', value: 'init' },
         { name: '2. 更新工作流               - 更新到最新版本', value: 'update' },
         { name: '3. 配置 MCP                 - 必装 / 数据库 / Git / 文件资源', value: 'mcp' },
-        { name: '4. 配置 API                 - 自定义 API 端点', value: 'api' },
+        { name: '4. 配置 API                 - 打开 cc-switch 下载页', value: 'api' },
         { name: '5. 配置输出风格             - 选择常用输出人格', value: 'style' },
         new inquirer.Separator('─────────────── 其他工具 ────────────────'),
         { name: 'T. 实用工具                 - ccusage, CCometixLine', value: 'tools' },

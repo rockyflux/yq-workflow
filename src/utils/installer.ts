@@ -57,6 +57,10 @@ interface InstallContext {
   result: InstallResult
 }
 
+function getAgentSkillsDir(): string {
+  return process.env.YQ_AGENT_SKILLS_DIR || join(homedir(), '.agents', 'skills')
+}
+
 async function copyMdTemplates(
   ctx: InstallContext,
   srcDir: string,
@@ -187,6 +191,27 @@ async function getYqAgentTemplateDirNames(templateDir: string): Promise<string[]
   return entries.filter(entry => entry.isDirectory()).map(entry => entry.name)
 }
 
+async function getBaseSkillNames(templateDir: string): Promise<string[]> {
+  const baseSkillsTemplateDir = join(templateDir, 'base-skills')
+  if (!(await fs.pathExists(baseSkillsTemplateDir))) return []
+
+  const entries = await fs.readdir(baseSkillsTemplateDir, { withFileTypes: true })
+  return entries.filter(entry => entry.isDirectory()).map(entry => entry.name)
+}
+
+async function hasSuperpowersTemplateDir(templateDir: string): Promise<boolean> {
+  const superpowersTemplateDir = join(templateDir, 'superpowers')
+  return fs.pathExists(superpowersTemplateDir)
+}
+
+async function getSuperpowersSkillNames(templateDir: string): Promise<string[]> {
+  const superpowersTemplateDir = join(templateDir, 'superpowers')
+  if (!(await fs.pathExists(superpowersTemplateDir))) return []
+
+  const entries = await fs.readdir(superpowersTemplateDir, { withFileTypes: true })
+  return entries.filter(entry => entry.isDirectory()).map(entry => entry.name)
+}
+
 async function installSkillFiles(ctx: InstallContext): Promise<void> {
   const skillsTemplateDir = join(ctx.templateDir, 'skills')
   const skillsDestDir = join(ctx.installDir, 'skills', 'yq')
@@ -243,24 +268,42 @@ async function installSkillFiles(ctx: InstallContext): Promise<void> {
 
 async function installYqAgentSkills(ctx: InstallContext): Promise<void> {
   const yqSkillsTemplateDir = join(ctx.templateDir, 'yq-skills')
-  if (!(await fs.pathExists(yqSkillsTemplateDir))) return
+  const baseSkillsTemplateDir = join(ctx.templateDir, 'base-skills')
+  const superpowersTemplateDir = join(ctx.templateDir, 'superpowers')
+  if (
+    !(await fs.pathExists(yqSkillsTemplateDir))
+    && !(await fs.pathExists(baseSkillsTemplateDir))
+    && !(await fs.pathExists(superpowersTemplateDir))
+  ) return
 
   try {
-    const agentSkillsDir = join(homedir(), '.agents', 'skills')
+    const agentSkillsDir = getAgentSkillsDir()
     await fs.ensureDir(agentSkillsDir)
-    let installedCount = 0
 
-    const topLevelEntries = await fs.readdir(yqSkillsTemplateDir, { withFileTypes: true })
-    for (const entry of topLevelEntries) {
-      if (!entry.isDirectory()) continue
-      await fs.copy(join(yqSkillsTemplateDir, entry.name), join(agentSkillsDir, entry.name), {
+    if (await fs.pathExists(yqSkillsTemplateDir)) {
+      await fs.copy(yqSkillsTemplateDir, join(agentSkillsDir, 'yq'), {
         overwrite: true,
         errorOnExist: false,
       })
-      installedCount += 1
+      ctx.result.installedAgentSkills = (await getYqAgentTemplateDirNames(ctx.templateDir)).length
     }
 
-    ctx.result.installedAgentSkills = installedCount
+    if (await fs.pathExists(baseSkillsTemplateDir)) {
+      await fs.copy(baseSkillsTemplateDir, join(agentSkillsDir, 'yq-base'), {
+        overwrite: true,
+        errorOnExist: false,
+      })
+      ctx.result.installedBaseSkills = (await getBaseSkillNames(ctx.templateDir)).length
+    }
+
+    if (await fs.pathExists(superpowersTemplateDir)) {
+      await fs.copy(superpowersTemplateDir, join(agentSkillsDir, 'superpowers'), {
+        overwrite: true,
+        errorOnExist: false,
+      })
+      ctx.result.installedSuperpowers = (await getSuperpowersSkillNames(ctx.templateDir)).length
+    }
+
   }
   catch (error) {
     ctx.result.errors.push(`Failed to install yq agent skills: ${error}`)
@@ -346,6 +389,8 @@ export async function installWorkflows(
       installedPrompts: [],
       installedSkills: 0,
       installedAgentSkills: 0,
+      installedBaseSkills: 0,
+      installedSuperpowers: 0,
       errors: [],
       configPath: '',
     },
@@ -405,7 +450,7 @@ export async function uninstallWorkflows(installDir: string): Promise<UninstallR
   const skillsDir = join(installDir, 'skills', 'yq')
   const rulesDir = join(installDir, 'rules')
   const yqConfigDir = join(installDir, '.yq')
-  const userAgentSkillsDir = join(homedir(), '.agents', 'skills')
+  const userAgentSkillsDir = getAgentSkillsDir()
 
   try {
     result.removedCommands = await removeDirCollectMdNames(commandsDir)
@@ -426,7 +471,14 @@ export async function uninstallWorkflows(installDir: string): Promise<UninstallR
   if (await fs.pathExists(userAgentSkillsDir)) {
     try {
       const yqAgentDirNames = await getYqAgentTemplateDirNames(join(PACKAGE_ROOT, 'templates'))
-      for (const dirName of yqAgentDirNames) {
+      const baseSkillNames = await getBaseSkillNames(join(PACKAGE_ROOT, 'templates'))
+      const mirroredDirNames = [
+        ...(yqAgentDirNames.length > 0 ? ['yq'] : []),
+        ...(baseSkillNames.length > 0 ? ['yq-base'] : []),
+        ...(await hasSuperpowersTemplateDir(join(PACKAGE_ROOT, 'templates')) ? ['superpowers'] : []),
+      ]
+
+      for (const dirName of new Set(mirroredDirNames)) {
         const mirroredDir = join(userAgentSkillsDir, dirName)
         if (await fs.pathExists(mirroredDir)) {
           await fs.remove(mirroredDir)
@@ -491,6 +543,12 @@ export function showInstallSummary(result: InstallResult): void {
   }
   if ((result.installedAgentSkills || 0) > 0) {
     console.log(ansis.gray(`Agent Skills: ${result.installedAgentSkills}`))
+  }
+  if ((result.installedBaseSkills || 0) > 0) {
+    console.log(ansis.gray(`Base Skills: ${result.installedBaseSkills}`))
+  }
+  if ((result.installedSuperpowers || 0) > 0) {
+    console.log(ansis.gray(`Superpowers: ${result.installedSuperpowers}`))
   }
   if (result.errors.length > 0) {
     console.log(ansis.yellow(`Warnings: ${result.errors.length}`))
