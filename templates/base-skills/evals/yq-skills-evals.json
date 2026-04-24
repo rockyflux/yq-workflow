@@ -1,0 +1,246 @@
+{
+  "bundle": "yq-software-delivery-skills",
+  "version": "0.1.0",
+  "evals": [
+    {
+      "skill": "yq-req-analysis",
+      "type": "should_trigger",
+      "prompt": "我这边准备做一个优惠券核销功能，需求现在只有一段群聊记录和几条口头补充，你先帮我梳理范围、角色、边界和验收标准。",
+      "expected": "Produce a requirement analysis with scope, actors, constraints, acceptance criteria, and open questions."
+    },
+    {
+      "skill": "yq-req-analysis",
+      "type": "should_trigger",
+      "prompt": "产品说先做最小可用版本，但运营又提了 8 个补充点。你先别写方案，帮我把这次到底要做什么和明确不做什么整理出来。",
+      "expected": "Should focus on scope clarification, in-scope vs out-of-scope, and open questions."
+    },
+    {
+      "skill": "yq-system-design",
+      "type": "should_trigger",
+      "prompt": "需求已经定了，帮我设计一下这个订单取消能力的系统方案，包括模块边界、状态流转、失败补偿和监控告警。",
+      "expected": "Produce a system design with architecture, flows, trade-offs, and non-functional concerns."
+    },
+    {
+      "skill": "yq-system-design",
+      "type": "should_trigger",
+      "prompt": "我们准备把同步导出改成异步任务，你帮我出一个系统设计，重点讲任务编排、重试、通知和失败恢复。",
+      "expected": "Should produce architecture and operational design instead of directly writing code."
+    },
+    {
+      "skill": "yq-api-design",
+      "type": "should_trigger",
+      "prompt": "我们要把退款服务开放给前端和第三方商户，帮我把接口契约、错误码、幂等和版本策略设计出来。",
+      "expected": "Produce an API design with schemas, error model, idempotency, auth, and examples."
+    },
+    {
+      "skill": "yq-api-design",
+      "type": "should_trigger",
+      "prompt": "前端说筛选条件会越来越多，先帮我把查询接口设计清楚，包含分页、排序、过滤器和错误返回格式。",
+      "expected": "Should design API contract and response conventions."
+    },
+    {
+      "skill": "yq-db-design",
+      "type": "should_trigger",
+      "prompt": "这个库存预占功能需要落库，你帮我设计表结构、索引、状态字段和迁移方案，重点考虑高并发扣减。",
+      "expected": "Produce a database design with schema, indexes, lifecycle, and migration plan."
+    },
+    {
+      "skill": "yq-db-design",
+      "type": "should_trigger",
+      "prompt": "审计要求我们保留操作历史，你帮我设计一下主表和历史表怎么建，索引和归档策略也一起给出来。",
+      "expected": "Should design persistence model, constraints, and lifecycle strategy."
+    },
+    {
+      "skill": "yq-config-gen",
+      "type": "should_trigger",
+      "prompt": "新服务要上测试、预发、生产三套环境，帮我整理配置项并生成一份 .env.example 和参数说明。",
+      "expected": "Produce a configuration spec with grouped config items, env differences, and example template."
+    },
+    {
+      "skill": "yq-config-gen",
+      "type": "should_trigger",
+      "prompt": "把这个服务需要的 Redis、MySQL、对象存储和回调地址都整理成配置模板，顺便标出来哪些是敏感项。",
+      "expected": "Should produce config grouping, sensitivity notes, and example configuration."
+    },
+    {
+      "skill": "yq-code-gen",
+      "type": "should_trigger",
+      "prompt": "接口和表都定好了，现在帮我把用户标签同步任务落成代码，记得补上校验、异常处理和日志。",
+      "expected": "Produce implementation-oriented output focused on maintainable code generation."
+    },
+    {
+      "skill": "yq-code-gen",
+      "type": "should_trigger",
+      "prompt": "按照现有项目风格把这个 webhook 消费器实现出来，要求有幂等、参数校验和失败重试。",
+      "expected": "Should move into implementation with maintainability and error handling."
+    },
+    {
+      "skill": "yq-code-explain",
+      "type": "should_trigger",
+      "prompt": "我刚接手这个仓库，你先帮我解释一下 billing 模块的主流程、核心状态和它依赖的外部服务。",
+      "expected": "Produce a code explanation that focuses on purpose, flow, dependencies, and risks."
+    },
+    {
+      "skill": "yq-code-explain",
+      "type": "should_trigger",
+      "prompt": "这个缓存失效逻辑我没看懂，帮我按调用链解释一下，从入口到最终删除 key 的过程都说清楚。",
+      "expected": "Should explain code flow and dependencies instead of jumping into refactor or debugging."
+    },
+    {
+      "skill": "yq-debug",
+      "type": "should_trigger",
+      "prompt": "支付回调偶发失败，但重试后又能成功，帮我定位一下可能的根因和优先排查路径。",
+      "expected": "Produce a debugging report with symptom, evidence, hypotheses, root cause or next validation steps."
+    },
+    {
+      "skill": "yq-debug",
+      "type": "should_trigger",
+      "prompt": "这个单测在本地稳定通过，CI 上却偶发失败。你先别改实现，帮我排查根因和最小复现思路。",
+      "expected": "Should investigate failure mode and evidence before proposing code changes."
+    },
+    {
+      "skill": "yq-log-analysis",
+      "type": "should_trigger",
+      "prompt": "这里有一段昨晚 11 点到 11 点半的网关日志，帮我按 trace id 串起来，看看到底是哪一跳开始报 502 的。",
+      "expected": "Produce a log analysis with timeline, grouped signals, likely cause, and impact assessment."
+    },
+    {
+      "skill": "yq-log-analysis",
+      "type": "should_trigger",
+      "prompt": "批处理任务昨晚跑挂了，我给你导出了一份 worker 日志，帮我按 job id 整理时间线并找出失败前的关键事件。",
+      "expected": "Should reconstruct timeline and signal patterns from logs."
+    },
+    {
+      "skill": "yq-test-gen",
+      "type": "should_trigger",
+      "prompt": "这个鉴权中间件已经写完了，帮我补一下单测和集成测试，重点覆盖权限不足、token 过期和租户隔离。",
+      "expected": "Produce a test plan or tests covering core and edge scenarios."
+    },
+    {
+      "skill": "yq-test-gen",
+      "type": "should_trigger",
+      "prompt": "这个 bug 刚修完，帮我补一组回归测试，确保重复提交、空参数和并发请求这几类场景不会再炸。",
+      "expected": "Should generate regression-focused test coverage."
+    },
+    {
+      "skill": "yq-code-review",
+      "type": "should_trigger",
+      "prompt": "帮我 review 一下这次用户导出功能的改动，重点看回归风险、逻辑漏洞和测试缺口。",
+      "expected": "Produce review findings ordered by severity with testing gaps and overall assessment."
+    },
+    {
+      "skill": "yq-code-review",
+      "type": "should_trigger",
+      "prompt": "这个 PR 改了缓存、SQL 和接口返回，我想知道有没有隐藏 bug、行为变化或者没覆盖到的测试点。",
+      "expected": "Should perform a review-first assessment with findings before summary."
+    },
+    {
+      "skill": "yq-security-scan",
+      "type": "should_trigger",
+      "prompt": "这个文件上传接口准备上线，帮我做一轮安全扫描，重点关注越权、恶意文件和敏感信息泄露。",
+      "expected": "Produce a security scan report with findings, exploit path, severity, and release recommendation."
+    },
+    {
+      "skill": "yq-security-scan",
+      "type": "should_trigger",
+      "prompt": "我们新加了一个管理员批量操作接口，帮我从权限、审计和输入校验角度过一遍安全风险。",
+      "expected": "Should focus on application security review and exploit paths."
+    },
+    {
+      "skill": "yq-dependency-check",
+      "type": "should_trigger",
+      "prompt": "我们准备把核心服务里的依赖都过一遍，帮我看下有哪些漏洞包、过旧版本和潜在 breaking change 风险。",
+      "expected": "Produce a dependency risk report with security, compatibility, and upgrade recommendations."
+    },
+    {
+      "skill": "yq-dependency-check",
+      "type": "should_trigger",
+      "prompt": "想把框架从 2.x 升到 3.x，你先帮我分析依赖树里哪些包可能不兼容，哪些升级要重点验证。",
+      "expected": "Should assess dependency compatibility and upgrade risk."
+    },
+    {
+      "skill": "yq-performance-opt",
+      "type": "should_trigger",
+      "prompt": "订单列表接口在高峰期平均 1.8 秒，帮我分析瓶颈并给一个按收益排序的优化方案。",
+      "expected": "Produce a performance analysis with evidence, bottlenecks, options, and verification plan."
+    },
+    {
+      "skill": "yq-performance-opt",
+      "type": "should_trigger",
+      "prompt": "这个定时任务 CPU 打满了，你帮我从 profile、批处理粒度和 IO 等角度给个优化思路，最好按投入产出排序。",
+      "expected": "Should focus on bottlenecks, evidence, and optimization trade-offs."
+    },
+    {
+      "skill": "yq-code-refactor",
+      "type": "should_trigger",
+      "prompt": "这段同步逻辑越来越难维护了，帮我规划一下怎么重构，先保证行为不变，再把重复和耦合降下来。",
+      "expected": "Produce a refactor plan or summary focused on structural improvements without changing intended behavior."
+    },
+    {
+      "skill": "yq-code-refactor",
+      "type": "should_trigger",
+      "prompt": "这个 service 文件已经快 1200 行了，帮我想一个安全的拆分方案，目标是职责更清晰但不改现有行为。",
+      "expected": "Should emphasize behavior-preserving structural improvement."
+    },
+    {
+      "skill": "yq-doc-gen",
+      "type": "should_trigger",
+      "prompt": "这个功能已经做完了，帮我补 README、接口说明和上线回滚步骤，给测试和运维都能看懂。",
+      "expected": "Produce delivery-oriented documentation structure and key content sections."
+    },
+    {
+      "skill": "yq-doc-gen",
+      "type": "should_trigger",
+      "prompt": "把这次数据库变更、接口调整和部署注意事项整理成一份交付文档，后面我要发给测试和运维。",
+      "expected": "Should generate structured technical and delivery documentation."
+    },
+    {
+      "skill": "yq-git-helper",
+      "type": "should_trigger",
+      "prompt": "我现在一堆改动混在一起，帮我整理成合理的 commit 和 PR 描述，顺便给我一个合并前检查清单。",
+      "expected": "Produce a Git and PR helper output with branch strategy, commit plan, PR summary, and merge checklist."
+    },
+    {
+      "skill": "yq-git-helper",
+      "type": "should_trigger",
+      "prompt": "这个功能、重构和文档改动全混在一个分支了，帮我规划一下怎么拆 commit，以及 PR 描述该怎么写 reviewer 才看得懂。",
+      "expected": "Should focus on branch, commit, PR organization, and merge readiness."
+    },
+    {
+      "skill": "yq-code-gen",
+      "type": "should_not_trigger",
+      "prompt": "帮我把这个产品介绍文案写得更有销售感一点，风格偏简洁专业。",
+      "expected": "Should not route to implementation skill because the task is copywriting, not software delivery code generation."
+    },
+    {
+      "skill": "yq-log-analysis",
+      "type": "should_not_trigger",
+      "prompt": "帮我看看这篇博客的逻辑顺不顺，顺便润色一下表达。",
+      "expected": "Should not route to log analysis because there are no logs or operational signals."
+    },
+    {
+      "skill": "yq-dependency-check",
+      "type": "should_not_trigger",
+      "prompt": "我想比较一下两家云厂商的商务报价，帮我整理优缺点。",
+      "expected": "Should not route to dependency checking because the task is vendor comparison, not package or dependency risk."
+    },
+    {
+      "skill": "yq-code-review",
+      "type": "should_not_trigger",
+      "prompt": "帮我总结一下这次会议纪要，整理成 5 条结论。",
+      "expected": "Should not route to code review because the task is summarization without code changes."
+    },
+    {
+      "skill": "yq-debug",
+      "type": "should_not_trigger",
+      "prompt": "我想给团队取一个更酷一点的项目代号，帮我想 20 个。",
+      "expected": "Should not route to debugging because there is no failure, symptom, or issue to investigate."
+    },
+    {
+      "skill": "yq-config-gen",
+      "type": "should_not_trigger",
+      "prompt": "把这个 Excel 表里的销售额算一下总和并画个柱状图。",
+      "expected": "Should not route to config generation because the task is spreadsheet analysis."
+    }
+  ]
+}
