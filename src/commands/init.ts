@@ -23,16 +23,10 @@ export async function init(options: InitOptions = {}): Promise<void> {
 
   let mcpProvider = existingConfig?.mcp?.provider || 'skip'
   const liteMode = true
-  let skipImpeccable = existingConfig?.performance?.skipImpeccable || false
+  const skipImpeccable = false
 
   if (!options.skipPrompt) {
     const installAnswers = await inquirer.prompt([
-      {
-        type: 'confirm',
-        name: 'installImpeccable',
-        message: '安装 Impeccable 前端 UI/UX 设计增强命令包？',
-        default: !skipImpeccable,
-      },
       {
         type: 'confirm',
         name: 'confirmInstall',
@@ -47,8 +41,6 @@ export async function init(options: InitOptions = {}): Promise<void> {
       console.log()
       return
     }
-
-    skipImpeccable = !installAnswers.installImpeccable
   }
 
   const result = await installWorkflows(selectedWorkflows, installDir, options.force || false, {

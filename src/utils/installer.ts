@@ -2,7 +2,7 @@ import type { InstallResult } from '../types'
 import ansis from 'ansis'
 import fs from 'fs-extra'
 import { homedir } from 'node:os'
-import { basename, join } from 'pathe'
+import { basename, dirname, join } from 'pathe'
 import { getWorkflowById } from './installer-data'
 import { PACKAGE_ROOT, injectConfigVariables, replaceHomePathsInTemplate } from './installer-template'
 import { installSkillCommands } from './skill-registry'
@@ -61,6 +61,19 @@ export function getAgentSkillsDir(): string {
   return process.env.YQ_AGENT_SKILLS_DIR || join(homedir(), '.agents', 'skills')
 }
 
+export function getCodexDir(): string {
+  return process.env.YQ_CODEX_DIR || join(homedir(), '.codex')
+}
+
+async function prepareDirectoryDestination(destDir: string): Promise<void> {
+  if (!(await fs.pathExists(destDir))) return
+
+  const stats = await fs.lstat(destDir)
+  if (stats.isDirectory()) return
+
+  await fs.remove(destDir)
+}
+
 async function copyMdTemplates(
   ctx: InstallContext,
   srcDir: string,
@@ -84,6 +97,47 @@ async function copyMdTemplates(
     installed.push(file.replace('.md', ''))
   }
   return installed
+}
+
+function getBackupFilePath(filePath: string): string {
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
+  return `${filePath}.bak-${timestamp}`
+}
+
+async function backupFileIfExists(filePath: string): Promise<string | null> {
+  if (!(await fs.pathExists(filePath))) return null
+
+  const stats = await fs.lstat(filePath)
+  if (!stats.isFile()) {
+    throw new Error(`Destination exists but is not a file: ${filePath}`)
+  }
+
+  const backupPath = getBackupFilePath(filePath)
+  await fs.copy(filePath, backupPath, { overwrite: false, errorOnExist: true })
+  return backupPath
+}
+
+async function installTemplateFile(
+  ctx: InstallContext,
+  srcFile: string,
+  destFile: string,
+  options: { inject?: boolean, backupBeforeOverwrite?: boolean, overwrite?: boolean } = {},
+): Promise<void> {
+  if (!(await fs.pathExists(srcFile))) return
+
+  await fs.ensureDir(dirname(destFile))
+
+  if (options.overwrite === false && await fs.pathExists(destFile)) return
+
+  let content = await fs.readFile(srcFile, 'utf-8')
+  if (options.inject) content = injectConfigVariables(content, ctx.config)
+  content = replaceHomePathsInTemplate(content, ctx.installDir)
+
+  if (options.backupBeforeOverwrite) {
+    await backupFileIfExists(destFile)
+  }
+
+  await fs.writeFile(destFile, content, 'utf-8')
 }
 
 function generateCommandPlaceholder(workflow: NonNullable<ReturnType<typeof getWorkflowById>>): string {
@@ -281,7 +335,9 @@ async function installYqAgentSkills(ctx: InstallContext): Promise<void> {
     await fs.ensureDir(agentSkillsDir)
 
     if (await fs.pathExists(yqSkillsTemplateDir)) {
-      await fs.copy(yqSkillsTemplateDir, join(agentSkillsDir, 'yq'), {
+      const yqSkillsDestDir = join(agentSkillsDir, 'yq')
+      await prepareDirectoryDestination(yqSkillsDestDir)
+      await fs.copy(yqSkillsTemplateDir, yqSkillsDestDir, {
         overwrite: true,
         errorOnExist: false,
       })
@@ -289,7 +345,9 @@ async function installYqAgentSkills(ctx: InstallContext): Promise<void> {
     }
 
     if (await fs.pathExists(baseSkillsTemplateDir)) {
-      await fs.copy(baseSkillsTemplateDir, join(agentSkillsDir, 'yq-base'), {
+      const baseSkillsDestDir = join(agentSkillsDir, 'yq-base')
+      await prepareDirectoryDestination(baseSkillsDestDir)
+      await fs.copy(baseSkillsTemplateDir, baseSkillsDestDir, {
         overwrite: true,
         errorOnExist: false,
       })
@@ -297,7 +355,9 @@ async function installYqAgentSkills(ctx: InstallContext): Promise<void> {
     }
 
     if (await fs.pathExists(superpowersTemplateDir)) {
-      await fs.copy(superpowersTemplateDir, join(agentSkillsDir, 'superpowers'), {
+      const superpowersDestDir = join(agentSkillsDir, 'superpowers')
+      await prepareDirectoryDestination(superpowersDestDir)
+      await fs.copy(superpowersTemplateDir, superpowersDestDir, {
         overwrite: true,
         errorOnExist: false,
       })
@@ -364,6 +424,27 @@ async function installRuleFiles(ctx: InstallContext): Promise<void> {
   }
 }
 
+async function installGlobalInstructionFiles(ctx: InstallContext): Promise<void> {
+  try {
+    await installTemplateFile(
+      ctx,
+      join(ctx.templateDir, 'AGENTS.md'),
+      join(getCodexDir(), 'AGENTS.md'),
+      { backupBeforeOverwrite: true, overwrite: true },
+    )
+    await installTemplateFile(
+      ctx,
+      join(ctx.templateDir, 'CLAUDE.md'),
+      join(ctx.installDir, 'CLAUDE.md'),
+      { backupBeforeOverwrite: true, overwrite: true },
+    )
+  }
+  catch (error) {
+    ctx.result.errors.push(`Failed to install global instruction files: ${error}`)
+    ctx.result.success = false
+  }
+}
+
 export async function installWorkflows(
   workflowIds: string[],
   installDir: string,
@@ -412,6 +493,7 @@ export async function installWorkflows(
   await installYqAgentSkills(ctx)
   await installSkillGeneratedCommands(ctx)
   await installRuleFiles(ctx)
+  await installGlobalInstructionFiles(ctx)
 
   if (ctx.result.installedCommands.length === 0 && ctx.result.errors.length === 0) {
     ctx.result.errors.push(`No commands were installed (expected ${workflowIds.length}).`)

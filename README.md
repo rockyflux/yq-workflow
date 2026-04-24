@@ -10,6 +10,10 @@ YQ 是一个面向AI编程工作流工具包，用来把命令、提示词、技
 - `templates/yq-skills/` -> `~/.agents/skills/yq/`
 - `templates/base-skills/` -> `~/.agents/skills/yq-base/`
 - `templates/superpowers/` -> `~/.agents/skills/superpowers/`
+- `templates/AGENTS.md` -> `~/.codex/AGENTS.md`
+- `templates/CLAUDE.md` -> `~/.claude/CLAUDE.md`
+
+若目标文件已存在，安装时会先生成同目录时间戳备份，再覆盖为最新模板。
 
 ## 它能做什么
 
@@ -28,6 +32,7 @@ npx yq-workflow
 
 - 使用简体中文，不再弹出语言选择
 - 初始化默认走无 Web UI 的轻量安装路径
+- 初始化会默认安装 `Impeccable` 前端 UI/UX 设计增强命令包，不再单独询问
 - 主菜单会检测本地是否已安装工作流，并提示版本状态
 
 也可以直接打开菜单或初始化：

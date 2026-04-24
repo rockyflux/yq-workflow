@@ -18,6 +18,8 @@ Thumbs.db
 # IDE
 .idea/
 .vscode/
+.cursor/
+templates/.cursor/
 *.swp
 *.swo
 
@@ -44,6 +46,7 @@ openspec/
 AGENTS.md
 
 # VitePress build output
+docs/.vitepress/.temp/
 docs/.vitepress/dist/
 docs/.vitepress/cache/
 WINDOWS_FIX.md
