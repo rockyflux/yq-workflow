@@ -80,6 +80,22 @@ export async function getLatestVersion(packageName = 'yq-workflow'): Promise<str
 }
 
 /**
+ * Get globally installed version for an npm package.
+ */
+export async function getGlobalPackageVersion(packageName: string): Promise<string | null> {
+  try {
+    const { stdout: globalRoot } = await execAsync('npm root -g', {
+      timeout: 30000,
+    })
+    const packageJsonPath = join(globalRoot.trim(), packageName, 'package.json')
+    return await readPackageVersion(packageJsonPath)
+  }
+  catch {
+    return null
+  }
+}
+
+/**
  * Compare two semantic versions
  * @returns 1 if v1 > v2, -1 if v1 < v2, 0 if equal
  */

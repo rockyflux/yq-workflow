@@ -1,6 +1,6 @@
 {
   "name": "yq-workflow",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "YQ workflow toolkit for installing Claude Code command packs, prompts, and project helpers",
   "type": "module",
   "packageManager": "pnpm@10.17.1",
@@ -29,6 +29,7 @@
     "templates/prompts/claude/",
     "templates/output-styles/",
     "templates/skills/",
+    "templates/yq-skills/",
     "templates/rules/"
   ],
   "scripts": {

@@ -1,6 +1,7 @@
 import type { InstallResult } from '../types'
 import ansis from 'ansis'
 import fs from 'fs-extra'
+import { homedir } from 'node:os'
 import { basename, join } from 'pathe'
 import { getWorkflowById } from './installer-data'
 import { PACKAGE_ROOT, injectConfigVariables, replaceHomePathsInTemplate } from './installer-template'
@@ -178,6 +179,14 @@ async function removeDirCollectMdNames(dir: string): Promise<string[]> {
   return names
 }
 
+async function getYqAgentTemplateDirNames(templateDir: string): Promise<string[]> {
+  const yqSkillsTemplateDir = join(templateDir, 'yq-skills')
+  if (!(await fs.pathExists(yqSkillsTemplateDir))) return []
+
+  const entries = await fs.readdir(yqSkillsTemplateDir, { withFileTypes: true })
+  return entries.filter(entry => entry.isDirectory()).map(entry => entry.name)
+}
+
 async function installSkillFiles(ctx: InstallContext): Promise<void> {
   const skillsTemplateDir = join(ctx.templateDir, 'skills')
   const skillsDestDir = join(ctx.installDir, 'skills', 'yq')
@@ -228,6 +237,33 @@ async function installSkillFiles(ctx: InstallContext): Promise<void> {
   }
   catch (error) {
     ctx.result.errors.push(`Failed to install skills: ${error}`)
+    ctx.result.success = false
+  }
+}
+
+async function installYqAgentSkills(ctx: InstallContext): Promise<void> {
+  const yqSkillsTemplateDir = join(ctx.templateDir, 'yq-skills')
+  if (!(await fs.pathExists(yqSkillsTemplateDir))) return
+
+  try {
+    const agentSkillsDir = join(homedir(), '.agents', 'skills')
+    await fs.ensureDir(agentSkillsDir)
+    let installedCount = 0
+
+    const topLevelEntries = await fs.readdir(yqSkillsTemplateDir, { withFileTypes: true })
+    for (const entry of topLevelEntries) {
+      if (!entry.isDirectory()) continue
+      await fs.copy(join(yqSkillsTemplateDir, entry.name), join(agentSkillsDir, entry.name), {
+        overwrite: true,
+        errorOnExist: false,
+      })
+      installedCount += 1
+    }
+
+    ctx.result.installedAgentSkills = installedCount
+  }
+  catch (error) {
+    ctx.result.errors.push(`Failed to install yq agent skills: ${error}`)
     ctx.result.success = false
   }
 }
@@ -308,6 +344,8 @@ export async function installWorkflows(
       success: true,
       installedCommands: [],
       installedPrompts: [],
+      installedSkills: 0,
+      installedAgentSkills: 0,
       errors: [],
       configPath: '',
     },
@@ -326,6 +364,7 @@ export async function installWorkflows(
   await installCommandFiles(ctx, workflowIds)
   await installPromptFiles(ctx)
   await installSkillFiles(ctx)
+  await installYqAgentSkills(ctx)
   await installSkillGeneratedCommands(ctx)
   await installRuleFiles(ctx)
 
@@ -366,6 +405,7 @@ export async function uninstallWorkflows(installDir: string): Promise<UninstallR
   const skillsDir = join(installDir, 'skills', 'yq')
   const rulesDir = join(installDir, 'rules')
   const yqConfigDir = join(installDir, '.yq')
+  const userAgentSkillsDir = join(homedir(), '.agents', 'skills')
 
   try {
     result.removedCommands = await removeDirCollectMdNames(commandsDir)
@@ -381,6 +421,23 @@ export async function uninstallWorkflows(installDir: string): Promise<UninstallR
   catch (error) {
     result.errors.push(`Failed to remove agents directory: ${error}`)
     result.success = false
+  }
+
+  if (await fs.pathExists(userAgentSkillsDir)) {
+    try {
+      const yqAgentDirNames = await getYqAgentTemplateDirNames(join(PACKAGE_ROOT, 'templates'))
+      for (const dirName of yqAgentDirNames) {
+        const mirroredDir = join(userAgentSkillsDir, dirName)
+        if (await fs.pathExists(mirroredDir)) {
+          await fs.remove(mirroredDir)
+          result.removedAgents.push(dirName)
+        }
+      }
+    }
+    catch (error) {
+      result.errors.push(`Failed to remove mirrored ~/.agents/skills directories: ${error}`)
+      result.success = false
+    }
   }
 
   if (await fs.pathExists(skillsDir)) {
@@ -428,6 +485,12 @@ export function showInstallSummary(result: InstallResult): void {
   console.log(ansis.gray(`Commands: ${result.installedCommands.length}`))
   if (result.installedPrompts.length > 0) {
     console.log(ansis.gray(`Prompts: ${result.installedPrompts.length}`))
+  }
+  if ((result.installedSkills || 0) > 0) {
+    console.log(ansis.gray(`Skills: ${result.installedSkills}`))
+  }
+  if ((result.installedAgentSkills || 0) > 0) {
+    console.log(ansis.gray(`Agent Skills: ${result.installedAgentSkills}`))
   }
   if (result.errors.length > 0) {
     console.log(ansis.yellow(`Warnings: ${result.errors.length}`))

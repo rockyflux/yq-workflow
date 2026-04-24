@@ -12,6 +12,7 @@ import { i18n } from '../i18n'
 import { getWorkflowConfigs, uninstallWorkflows } from '../utils/installer'
 import { readCcgConfig, writeCcgConfig } from '../utils/config'
 import { PACKAGE_ROOT } from '../utils/installer-template'
+import { compareVersions, getGlobalPackageVersion, getLatestVersion } from '../utils/version'
 
 type MenuAction =
   | 'init'
@@ -21,6 +22,8 @@ type MenuAction =
   | 'style'
   | 'tools'
   | 'install-claude'
+  | 'install-codex'
+  | 'check-updates'
   | 'help'
   | 'uninstall'
   | 'exit'
@@ -48,6 +51,18 @@ const STYLE_CHOICES: Array<{ name: string, value: StyleId, file?: string }> = [
   { name: '祭仪长卷 - 仪式感叙事张力', value: 'abyss-ritual', file: 'abyss-ritual.md' },
 ]
 
+type ManagedPackage = {
+  label: string
+  packageName: string
+}
+
+const MANAGED_PACKAGES: ManagedPackage[] = [
+  { label: 'Claude Code', packageName: '@anthropic-ai/claude-code' },
+  { label: 'Codex', packageName: '@openai/codex' },
+  { label: 'CCR', packageName: '@musistudio/claude-code-router' },
+  { label: 'CCometixLine', packageName: '@cometix/ccline' },
+]
+
 function getConfigFilePath(): string {
   return join(homedir(), '.claude', '.yq', 'config.toml')
 }
@@ -57,6 +72,40 @@ async function countInstalledCommands(): Promise<number> {
   if (!(await fs.pathExists(commandsDir))) return 0
   const files = await fs.readdir(commandsDir)
   return files.filter(file => file.endsWith('.md')).length
+}
+
+async function listInstalledCommands(): Promise<string[]> {
+  const commandsDir = join(homedir(), '.claude', 'commands', 'yq')
+  if (!(await fs.pathExists(commandsDir))) return []
+
+  const files = await fs.readdir(commandsDir)
+  return files
+    .filter(file => file.endsWith('.md'))
+    .map(file => file.replace(/\.md$/u, ''))
+    .sort((a, b) => a.localeCompare(b))
+}
+
+async function listInstalledYqAgentSkills(): Promise<string[]> {
+  const agentSkillsDir = join(homedir(), '.agents', 'skills')
+  const templateDir = join(PACKAGE_ROOT, 'templates', 'yq-skills')
+
+  if (!(await fs.pathExists(agentSkillsDir)) || !(await fs.pathExists(templateDir))) {
+    return []
+  }
+
+  const templateEntries = await fs.readdir(templateDir, { withFileTypes: true })
+  const installedSkills: string[] = []
+
+  for (const entry of templateEntries) {
+    if (!entry.isDirectory()) continue
+    const skillDir = join(agentSkillsDir, entry.name)
+    const skillFile = join(skillDir, 'SKILL.md')
+    if (await fs.pathExists(skillFile)) {
+      installedSkills.push(entry.name)
+    }
+  }
+
+  return installedSkills.sort((a, b) => a.localeCompare(b))
 }
 
 function drawHeader(commandCount: number): void {
@@ -273,6 +322,82 @@ async function runToolsMenu(): Promise<void> {
   console.log()
 }
 
+async function checkManagedPackageUpdates(): Promise<void> {
+  console.log()
+  console.log(ansis.cyan.bold('  检查工具更新'))
+  console.log(ansis.gray('  检查并更新 Claude Code、Codex、CCR 和 CCometixLine'))
+  console.log()
+
+  const packages = await Promise.all(
+    MANAGED_PACKAGES.map(async item => {
+      const [installedVersion, latestVersion] = await Promise.all([
+        getGlobalPackageVersion(item.packageName),
+        getLatestVersion(item.packageName),
+      ])
+
+      return {
+        ...item,
+        installedVersion,
+        latestVersion,
+      }
+    }),
+  )
+
+  for (const item of packages) {
+    const installedText = item.installedVersion
+      ? ansis.yellow(`v${item.installedVersion}`)
+      : ansis.gray('未安装')
+    const latestText = item.latestVersion
+      ? ansis.green(`v${item.latestVersion}`)
+      : ansis.red('查询失败')
+    console.log(`  ${ansis.cyan(item.label.padEnd(14))} 当前: ${installedText}  最新: ${latestText}`)
+  }
+
+  console.log()
+
+  const updatable = packages.filter(item =>
+    item.latestVersion
+    && (!item.installedVersion || compareVersions(item.latestVersion, item.installedVersion) > 0),
+  )
+
+  if (updatable.length === 0) {
+    console.log(ansis.green('  当前已是最新版本，或暂无可更新项目'))
+    console.log()
+    return
+  }
+
+  const { targets } = await inquirer.prompt([{
+    type: 'checkbox',
+    name: 'targets',
+    message: '选择要安装 / 更新的工具',
+    choices: updatable.map(item => ({
+      name: `${item.label} (${item.installedVersion ? `v${item.installedVersion}` : '未安装'} -> v${item.latestVersion})`,
+      value: item.packageName,
+      checked: true,
+    })),
+  }])
+
+  if (!targets.length) {
+    console.log()
+    console.log(ansis.gray('  已取消'))
+    console.log()
+    return
+  }
+
+  for (const packageName of targets as string[]) {
+    const item = updatable.find(entry => entry.packageName === packageName)
+    if (!item) continue
+
+    console.log()
+    console.log(ansis.cyan(`  正在更新 ${item.label}...`))
+    console.log()
+    await runInteractiveCommand('npm', ['install', '-g', `${item.packageName}@latest`])
+    console.log(ansis.green(`  ${item.label} 更新完成`))
+  }
+
+  console.log()
+}
+
 async function installClaudeCode(): Promise<void> {
   const { confirmInstall } = await inquirer.prompt([{
     type: 'confirm',
@@ -298,13 +423,67 @@ async function installClaudeCode(): Promise<void> {
   console.log()
 }
 
-function showHelp(): void {
+async function installCodex(): Promise<void> {
+  const { confirmInstall } = await inquirer.prompt([{
+    type: 'confirm',
+    name: 'confirmInstall',
+    message: '使用 npm 全局安装 / 更新 Codex？',
+    default: true,
+  }])
+
+  if (!confirmInstall) {
+    console.log()
+    console.log(ansis.gray('  已取消'))
+    console.log()
+    return
+  }
+
   console.log()
-  console.log(ansis.cyan.bold('  已安装命令概览'))
+  console.log(ansis.cyan('  正在安装 Codex...'))
   console.log()
-  for (const workflow of getWorkflowConfigs()) {
-    const command = workflow.commands[0]
-    console.log(`  ${ansis.green(`/yq:${command}`.padEnd(24))} ${ansis.gray(workflow.description || '')}`)
+  await runInteractiveCommand('npm', ['install', '-g', '@openai/codex'])
+  console.log()
+  console.log(ansis.green('  Codex 安装成功'))
+  console.log(ansis.gray('  运行 codex 命令启动'))
+  console.log()
+}
+
+async function showHelp(): Promise<void> {
+  const [installedCommands, installedSkills] = await Promise.all([
+    listInstalledCommands(),
+    listInstalledYqAgentSkills(),
+  ])
+
+  console.log()
+  console.log(ansis.cyan.bold('  已安装项概览'))
+  console.log()
+
+  console.log(ansis.cyan('  命令'))
+  if (installedCommands.length === 0) {
+    console.log(ansis.gray('    暂未发现已安装命令'))
+  }
+  else {
+    const workflowMap = new Map(
+      getWorkflowConfigs().flatMap(workflow =>
+        workflow.commands.map(command => [command, workflow.description || ''] as const),
+      ),
+    )
+
+    for (const command of installedCommands) {
+      const description = workflowMap.get(command) || ''
+      console.log(`  ${ansis.green(`/yq:${command}`.padEnd(24))} ${ansis.gray(description)}`)
+    }
+  }
+
+  console.log()
+  console.log(ansis.cyan('  Skills'))
+  if (installedSkills.length === 0) {
+    console.log(ansis.gray('    暂未发现已安装 yq-skills'))
+  }
+  else {
+    for (const skill of installedSkills) {
+      console.log(`  ${ansis.green(skill)}`)
+    }
   }
   console.log()
 }
@@ -364,8 +543,10 @@ export async function showMainMenu(): Promise<void> {
         new inquirer.Separator('─────────────── 其他工具 ────────────────'),
         { name: 'T. 实用工具                 - ccusage, CCometixLine', value: 'tools' },
         { name: 'C. 安装 Claude Code         - 安装 / 更新 CLI', value: 'install-claude' },
+        { name: 'D. 安装 Codex               - 安装 / 更新 CLI', value: 'install-codex' },
         new inquirer.Separator('────────────────── YQ ───────────────────'),
-        { name: 'H. 帮助                     - 查看已安装命令', value: 'help' },
+        { name: 'H. 帮助                     - 查看已安装命令和 Skills', value: 'help' },
+        { name: 'U. 检查更新                 - 检查并更新 Claude Code、Codex、CCR、CCometixLine', value: 'check-updates' },
         { name: '-. 卸载 YQ                  - 移除工作流文件', value: 'uninstall' },
         new inquirer.Separator('─────────────────────────────────────────'),
         { name: 'Q. 退出', value: 'exit' },
@@ -394,8 +575,14 @@ export async function showMainMenu(): Promise<void> {
       case 'install-claude':
         await installClaudeCode()
         break
+      case 'install-codex':
+        await installCodex()
+        break
+      case 'check-updates':
+        await checkManagedPackageUpdates()
+        break
       case 'help':
-        showHelp()
+        await showHelp()
         break
       case 'uninstall':
         await uninstall()

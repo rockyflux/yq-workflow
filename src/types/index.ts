@@ -56,6 +56,7 @@ export interface InstallResult {
   installedCommands: string[]
   installedPrompts: string[]
   installedSkills?: number
+  installedAgentSkills?: number
   installedSkillCommands?: number
   installedRules?: boolean
   errors: string[]
