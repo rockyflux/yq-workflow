@@ -85,27 +85,60 @@ async function listInstalledCommands(): Promise<string[]> {
     .sort((a, b) => a.localeCompare(b))
 }
 
-async function listInstalledYqAgentSkills(): Promise<string[]> {
-  const agentSkillsDir = join(homedir(), '.agents', 'skills')
-  const templateDir = join(PACKAGE_ROOT, 'templates', 'yq-skills')
+type InstalledSkill = {
+  name: string
+  path: string
+}
+
+async function listInstalledSkillsFromTemplate(templateSubdir: string, installSubdir: string): Promise<InstalledSkill[]> {
+  const agentSkillsDir = join(homedir(), '.agents', 'skills', installSubdir)
+  const templateDir = join(PACKAGE_ROOT, 'templates', templateSubdir)
 
   if (!(await fs.pathExists(agentSkillsDir)) || !(await fs.pathExists(templateDir))) {
     return []
   }
 
   const templateEntries = await fs.readdir(templateDir, { withFileTypes: true })
-  const installedSkills: string[] = []
+  const installedSkills: InstalledSkill[] = []
 
   for (const entry of templateEntries) {
     if (!entry.isDirectory()) continue
     const skillDir = join(agentSkillsDir, entry.name)
     const skillFile = join(skillDir, 'SKILL.md')
     if (await fs.pathExists(skillFile)) {
-      installedSkills.push(entry.name)
+      installedSkills.push({
+        name: entry.name,
+        path: skillDir,
+      })
     }
   }
 
-  return installedSkills.sort((a, b) => a.localeCompare(b))
+  return installedSkills.sort((a, b) => a.name.localeCompare(b.name))
+}
+
+async function listInstalledYqAgentSkills(): Promise<InstalledSkill[]> {
+  return listInstalledSkillsFromTemplate('yq-skills', 'yq')
+}
+
+async function listInstalledBaseSkills(): Promise<InstalledSkill[]> {
+  return listInstalledSkillsFromTemplate('base-skills', 'yq-base')
+}
+
+async function listInstalledSuperpowersSkills(): Promise<InstalledSkill[]> {
+  return listInstalledSkillsFromTemplate('superpowers', 'superpowers')
+}
+
+function printInstalledSkillsSection(title: string, items: InstalledSkill[], emptyText: string): void {
+  console.log()
+  console.log(ansis.cyan(`  ${title}`))
+  if (items.length === 0) {
+    console.log(ansis.gray(`    ${emptyText}`))
+    return
+  }
+
+  for (const item of items) {
+    console.log(`  ${ansis.green(item.name.padEnd(24))} ${ansis.gray(item.path)}`)
+  }
 }
 
 function drawHeader(commandCount: number): void {
@@ -449,9 +482,11 @@ async function installCodex(): Promise<void> {
 }
 
 async function showHelp(): Promise<void> {
-  const [installedCommands, installedSkills] = await Promise.all([
+  const [installedCommands, installedSkills, installedBaseSkills, installedSuperpowers] = await Promise.all([
     listInstalledCommands(),
     listInstalledYqAgentSkills(),
+    listInstalledBaseSkills(),
+    listInstalledSuperpowersSkills(),
   ])
 
   console.log()
@@ -475,16 +510,9 @@ async function showHelp(): Promise<void> {
     }
   }
 
-  console.log()
-  console.log(ansis.cyan('  Skills'))
-  if (installedSkills.length === 0) {
-    console.log(ansis.gray('    暂未发现已安装 yq-skills'))
-  }
-  else {
-    for (const skill of installedSkills) {
-      console.log(`  ${ansis.green(skill)}`)
-    }
-  }
+  printInstalledSkillsSection('Skills', installedSkills, '暂未发现已安装 yq-skills')
+  printInstalledSkillsSection('Base Skills', installedBaseSkills, '暂未发现已安装 yq-base skills')
+  printInstalledSkillsSection('Superpowers', installedSuperpowers, '暂未发现已安装 superpowers')
   console.log()
 }
 
@@ -545,7 +573,7 @@ export async function showMainMenu(): Promise<void> {
         { name: 'C. 安装 Claude Code         - 安装 / 更新 CLI', value: 'install-claude' },
         { name: 'D. 安装 Codex               - 安装 / 更新 CLI', value: 'install-codex' },
         new inquirer.Separator('────────────────── YQ ───────────────────'),
-        { name: 'H. 帮助                     - 查看已安装命令和 Skills', value: 'help' },
+        { name: 'H. 帮助                     - 查看已安装命令和Skills', value: 'help' },
         { name: 'U. 检查更新                 - 检查并更新 Claude Code、Codex、CCR、CCometixLine', value: 'check-updates' },
         { name: '-. 卸载 YQ                  - 移除工作流文件', value: 'uninstall' },
         new inquirer.Separator('─────────────────────────────────────────'),

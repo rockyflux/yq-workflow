@@ -73,7 +73,13 @@ export async function init(options: InitOptions = {}): Promise<void> {
     console.log(ansis.green(`  已安装 ${result.installedSkills} 个 Skills 到 ${join(installDir, 'skills', 'yq')}`))
   }
   if ((result.installedAgentSkills || 0) > 0) {
-    console.log(ansis.green(`  已安装 ${result.installedAgentSkills} 个 Agent Skills 到 ${join(homedir(), '.agents', 'skills')}`))
+    console.log(ansis.green(`  已安装 ${result.installedAgentSkills} 个 Agent Skills 到 ${join(homedir(), '.agents', 'skills', 'yq')}`))
+  }
+  if ((result.installedBaseSkills || 0) > 0) {
+    console.log(ansis.green(`  已安装 ${result.installedBaseSkills} 个 Base Skills 到 ${join(homedir(), '.agents', 'skills', 'yq-base')}`))
+  }
+  if ((result.installedSuperpowers || 0) > 0) {
+    console.log(ansis.green(`  已安装 ${result.installedSuperpowers} 个 Superpowers Skills 到 ${join(homedir(), '.agents', 'skills', 'superpowers')}`))
   }
   console.log(ansis.gray(`  配置文件: ${join(installDir, '.yq', 'config.toml')}`))
   if (mcpProvider !== 'skip') {
