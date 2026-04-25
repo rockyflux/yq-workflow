@@ -35,6 +35,7 @@ type MenuAction =
   | 'api'
   | 'tools'
   | 'coding-tools'
+  | 'ai-accounts'
   | 'help'
   | 'uninstall'
   | 'exit'
@@ -70,6 +71,49 @@ const CODING_TOOL_PACKAGES: ManagedPackage[] = [
     externalUrl: 'https://www.mossx.ai/download',
     externalActionText: '打开下载页',
     statusHint: '桌面客户端下载',
+  },
+]
+
+const AI_ACCOUNT_MANAGEMENT_PACKAGES: ManagedPackage[] = [
+  {
+    id: 'cockpit-tools',
+    label: 'Cockpit Tools',
+    description: '通用 AI IDE 账号管理工具，支持多账号多实例并行运行、一键切号',
+    installType: 'external-link',
+    openDirectly: true,
+    externalUrl: 'https://github.com/jlcodes99/cockpit-tools',
+    externalActionText: '打开项目主页',
+    statusHint: 'GitHub 项目页',
+  },
+  {
+    id: 'cli-proxy-api',
+    label: 'CLIProxyAPI',
+    description: '反代 / 聚合各渠道模型，对外提供统一 API Endpoint 与 Key',
+    installType: 'external-link',
+    openDirectly: true,
+    externalUrl: 'https://github.com/router-for-me/CLIProxyAPI',
+    externalActionText: '打开项目主页',
+    statusHint: 'GitHub 项目页',
+  },
+  {
+    id: 'cherry-studio',
+    label: 'Cherry Studio',
+    description: '跨平台 AI 对话客户端',
+    installType: 'external-link',
+    openDirectly: true,
+    externalUrl: 'https://www.cherry-ai.com/',
+    externalActionText: '打开官网',
+    statusHint: '官方网站',
+  },
+  {
+    id: 'sub2api-crs2',
+    label: 'Sub2API-CRS2',
+    description: '一站式开源中转服务，统一接入 Claude、OpenAI、Gemini、Antigravity 订阅',
+    installType: 'external-link',
+    openDirectly: true,
+    externalUrl: 'https://github.com/Wei-Shaw/sub2api',
+    externalActionText: '打开项目主页',
+    statusHint: 'GitHub 项目页',
   },
 ]
 
@@ -290,8 +334,25 @@ function formatMenuChoice(label: string, description?: string): string {
   return `${label}  ${ansis.gray(`-  ${normalizedDescription}`)}`
 }
 
+async function promptMenuList(questions: any): Promise<any> {
+  console.log()
+  const normalizedQuestions = Array.isArray(questions)
+    ? questions.map((question) => {
+        if (question?.type === 'list' && typeof question.message === 'string' && !question.message.endsWith('\n')) {
+          return {
+            ...question,
+            message: `${question.message}\n`,
+          }
+        }
+        return question
+      })
+    : questions
+
+  return inquirer.prompt(normalizedQuestions)
+}
+
 function shouldPauseAfterMainMenuAction(action: MenuAction): boolean {
-  return !['mcp', 'skills', 'tools', 'coding-tools', 'environment', 'popular-workflows'].includes(action)
+  return !['mcp', 'skills', 'tools', 'coding-tools', 'ai-accounts', 'environment', 'popular-workflows'].includes(action)
 }
 
 async function getInstallStatus(commandCount: number): Promise<InstallStatus> {
@@ -598,16 +659,19 @@ async function getManagedPackageStatuses(packages: ManagedPackage[]): Promise<Ma
 async function detectManagedPackageStatuses(
   packages: ManagedPackage[],
   title: string,
+  options?: {
+    silent?: boolean
+  },
 ): Promise<ManagedPackageStatus[]> {
-  const spinner = ora(`正在检测${title}版本...`).start()
+  const spinner = options?.silent ? null : ora(`正在检测${title}版本...`).start()
 
   try {
     const statuses = await getManagedPackageStatuses(packages)
-    spinner.succeed(`${title}版本检测完成`)
+    spinner?.succeed(`${title}版本检测完成`)
     return statuses
   }
   catch (error) {
-    spinner.fail(`${title}版本检测失败`)
+    spinner?.fail(`${title}版本检测失败`)
     throw error
   }
 }
@@ -626,6 +690,13 @@ function printManagedPackageStatusLines(
 
   for (const item of packages) {
     if (item.openDirectly) {
+      const statusText = item.latestVersion
+        ? ansis.green(item.latestVersion)
+        : ansis.gray(item.externalActionText || '打开网页')
+      console.log(`  ${ansis.cyan(item.label.padEnd(14))} ${statusText}`)
+      if (item.description) {
+        console.log(ansis.gray(`  ${' '.repeat(16)}${item.description}`))
+      }
       continue
     }
 
@@ -664,7 +735,7 @@ function printManagedPackageStatusLines(
 function formatManagedPackageChoice(item: ManagedPackageStatus): string {
   if (item.installType === 'external-link') {
     if (item.openDirectly) {
-      return `${item.label}  ${ansis.gray(`- ${item.description || '打开项目主页'}`)}`
+      return `${item.label}  ${ansis.gray(`- ${item.description || item.externalActionText || '打开网页'}`)}`
     }
 
     const description = item.description ? `；${item.description}` : ''
@@ -858,7 +929,7 @@ async function manageSinglePackage(item: ManagedPackageStatus): Promise<void> {
     { name: '返回', value: 'back' },
   ]
 
-  const { action } = await inquirer.prompt([{
+  const { action } = await promptMenuList([{
     type: 'list',
     name: 'action',
     message: `选择 ${item.label} 的操作`,
@@ -889,17 +960,24 @@ async function runManagedPackageMenu(
     subtitle: string
     selectMessage: string
     continueMessage: string
+    silentDetection?: boolean
+    showSummary?: boolean
+    showRefresh?: boolean
   },
 ): Promise<void> {
   while (true) {
-    const statuses = await detectManagedPackageStatuses(packages, options.title)
-
-    printManagedPackageStatusLines(statuses, {
-      title: options.title,
-      subtitle: options.subtitle,
+    const statuses = await detectManagedPackageStatuses(packages, options.title, {
+      silent: options.silentDetection,
     })
 
-    const { target } = await inquirer.prompt([{
+    if (options.showSummary !== false) {
+      printManagedPackageStatusLines(statuses, {
+        title: options.title,
+        subtitle: options.subtitle,
+      })
+    }
+
+    const { target } = await promptMenuList([{
       type: 'list',
       name: 'target',
       message: options.selectMessage,
@@ -908,7 +986,7 @@ async function runManagedPackageMenu(
           name: formatManagedPackageChoice(item),
           value: item.id,
         })),
-        { name: '重新检测版本', value: 'refresh' },
+        ...(options.showRefresh === false ? [] : [{ name: '重新检测版本', value: 'refresh' }]),
         { name: '返回', value: 'back' },
       ],
       pageSize: 10,
@@ -966,7 +1044,7 @@ export async function configSkills(): Promise<void> {
     }
     console.log()
 
-    const { action } = await inquirer.prompt([{
+    const { action } = await promptMenuList([{
       type: 'list',
       name: 'action',
       message: '选择 Skills 操作',
@@ -979,7 +1057,7 @@ export async function configSkills(): Promise<void> {
         { name: '5. 检索并安装 Skills.sh 技能', value: 'search' },
         { name: '6. 安装指定 Skills 包 / 单个 Skill', value: 'install' },
         { name: '7. 更新全局 Skills', value: 'update' },
-        { name: '8. 打开 skills.sh', value: 'open' },
+        { name: '8. 打开网站 skills.sh', value: 'open' },
         { name: 'B. 返回', value: 'back' },
       ],
     }])
@@ -1056,6 +1134,18 @@ async function runCodingToolsMenu(): Promise<void> {
     subtitle: '统一管理 Claude Code、Codex、Gemini CLI、OpenCode 与 MossX 客户端',
     selectMessage: '选择要管理的编程工具',
     continueMessage: '按 Enter 返回编程工具菜单...',
+  })
+}
+
+async function runAiAccountManagementMenu(): Promise<void> {
+  await runManagedPackageMenu(AI_ACCOUNT_MANAGEMENT_PACKAGES, {
+    title: 'AI 账号管理',
+    subtitle: '集中收录常用 AI 账号管理、统一接入与桌面客户端入口，选中后立即打开网页',
+    selectMessage: '选择要打开的网页',
+    continueMessage: '按 Enter 返回 AI 账号管理菜单...',
+    silentDetection: true,
+    showSummary: false,
+    showRefresh: false,
   })
 }
 
@@ -1201,7 +1291,7 @@ async function manageBaseEnvironmentTool(tool: BaseEnvironmentToolStatus): Promi
     return true
   }
 
-  const { actionId } = await inquirer.prompt([{
+  const { actionId } = await promptMenuList([{
     type: 'list',
     name: 'actionId',
     message: `选择 ${tool.label} 的操作`,
@@ -1228,7 +1318,7 @@ async function runBaseEnvironmentMenu(): Promise<void> {
   while (true) {
     const statuses = await detectBaseEnvironmentStatuses()
     printBaseEnvironmentStatusLines(statuses)
-    const { target } = await inquirer.prompt([{
+    const { target } = await promptMenuList([{
       type: 'list',
       name: 'target',
       message: '选择要查看或安装的基础环境',
@@ -1354,7 +1444,7 @@ export async function showMainMenu(): Promise<void> {
     printInstallStatus(installStatus)
     printMenuResources()
 
-    const { action } = await inquirer.prompt([{
+    const { action } = await promptMenuList([{
       type: 'list',
       name: 'action',
       message: 'YQ 主菜单',
@@ -1370,6 +1460,7 @@ export async function showMainMenu(): Promise<void> {
         { name: formatMenuChoice('T. Claude Code 工具', '- Claude Code, ccusage, CCR, CCometixLine'), value: 'tools' },
         { name: formatMenuChoice('E. 基础环境检测', '- Git, PowerShell, Node.js, Python, pnpm, uv, VS Code'), value: 'environment' },
         { name: formatMenuChoice('C. 安装编程工具', '- Claude Code, Codex, Gemini, OpenCode, MossX'), value: 'coding-tools' },
+        { name: formatMenuChoice('I. AI 账号管理', '- Cockpit Tools, CLIProxyAPI, Cherry Studio, Sub2API'), value: 'ai-accounts' },
         { name: formatMenuChoice('A. 配置模型 API', '- 打开 cc-switch 下载页'), value: 'api' },
         new inquirer.Separator(`${MENU_SEPARATOR} YQ ${MENU_SEPARATOR}`),
         { name: formatMenuChoice('H. 帮助', '- 查看已安装命令、Skills 与工具'), value: 'help' },
@@ -1406,6 +1497,9 @@ export async function showMainMenu(): Promise<void> {
         break
       case 'coding-tools':
         await runCodingToolsMenu()
+        break
+      case 'ai-accounts':
+        await runAiAccountManagementMenu()
         break
       case 'help':
         await showHelp()
