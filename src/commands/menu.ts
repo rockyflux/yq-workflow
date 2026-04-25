@@ -17,6 +17,7 @@ import {
   detectBaseEnvironmentToolStatuses,
   getAgentSkillsDir,
   listAgentSkillDirectories,
+  SCIENTIFIC_INTERNET_GUIDE_URL,
   uninstallWorkflows,
 } from '../utils/installer'
 import type { BaseEnvironmentInstallAction, BaseEnvironmentToolStatus } from '../utils/installer'
@@ -44,6 +45,7 @@ type ManagedPackage = {
   packageName?: string
   description?: string
   installType?: 'npm' | 'external-link'
+  openDirectly?: boolean
   externalUrl?: string
   externalActionText?: string
   statusHint?: string
@@ -76,6 +78,16 @@ const CLAUDE_CODE_TOOL_PACKAGES: ManagedPackage[] = [
   { id: 'ccusage', label: 'ccusage', packageName: 'ccusage', runCommand: { command: 'npx', args: ['ccusage'], successText: '  ccusage 运行结束' } },
   { id: 'ccr', label: 'CCR', packageName: '@musistudio/claude-code-router' },
   { id: 'ccline', label: 'CCometixLine', packageName: '@cometix/ccline' },
+  {
+    id: 'claude-hud',
+    label: 'Claude HUD',
+    description: 'Claude Code 实时监控插件',
+    installType: 'external-link',
+    openDirectly: true,
+    externalUrl: 'https://github.com/jarrodwatts/claude-hud/',
+    externalActionText: '打开项目主页',
+    statusHint: 'GitHub 项目页',
+  },
 ]
 
 const POPULAR_WORKFLOW_PACKAGES: ManagedPackage[] = [
@@ -613,6 +625,10 @@ function printManagedPackageStatusLines(
   console.log()
 
   for (const item of packages) {
+    if (item.openDirectly) {
+      continue
+    }
+
     if (item.installType === 'external-link') {
       const statusText = item.latestVersion
         ? ansis.green(item.latestVersion)
@@ -647,6 +663,10 @@ function printManagedPackageStatusLines(
 
 function formatManagedPackageChoice(item: ManagedPackageStatus): string {
   if (item.installType === 'external-link') {
+    if (item.openDirectly) {
+      return `${item.label}  ${ansis.gray(`- ${item.description || '打开项目主页'}`)}`
+    }
+
     const description = item.description ? `；${item.description}` : ''
     return `${item.label}  ${ansis.gray(`- ${item.latestVersion || '桌面客户端下载'}${description}`)}`
   }
@@ -831,11 +851,11 @@ async function openManagedPackageTutorial(item: ManagedPackageStatus): Promise<v
 async function manageSinglePackage(item: ManagedPackageStatus): Promise<void> {
   const installLabel = getPackageActionLabel(item)
   const choices = [
-    { name: `1. ${installLabel}`, value: 'install' },
-    ...(item.installedVersion && item.installType !== 'external-link' ? [{ name: '2. 卸载', value: 'uninstall' }] : []),
-    ...(item.runCommand ? [{ name: item.installedVersion ? '3. 运行' : '3. 运行（npx）', value: 'run' }] : []),
-    ...(item.tutorialUrl && item.tutorialUrl !== item.externalUrl ? [{ name: '4. 打开教程', value: 'tutorial' }] : []),
-    { name: 'B. 返回', value: 'back' },
+    { name: installLabel, value: 'install' },
+    ...(item.installedVersion && item.installType !== 'external-link' ? [{ name: '卸载', value: 'uninstall' }] : []),
+    ...(item.runCommand ? [{ name: item.installedVersion ? '运行' : '运行（npx）', value: 'run' }] : []),
+    ...(item.tutorialUrl && item.tutorialUrl !== item.externalUrl ? [{ name: '打开教程', value: 'tutorial' }] : []),
+    { name: '返回', value: 'back' },
   ]
 
   const { action } = await inquirer.prompt([{
@@ -843,6 +863,9 @@ async function manageSinglePackage(item: ManagedPackageStatus): Promise<void> {
     name: 'action',
     message: `选择 ${item.label} 的操作`,
     choices,
+    theme: {
+      indexMode: 'number',
+    },
   }])
 
   if (action === 'install') {
@@ -885,10 +908,13 @@ async function runManagedPackageMenu(
           name: formatManagedPackageChoice(item),
           value: item.id,
         })),
-        { name: 'R. 重新检测版本', value: 'refresh' },
-        { name: 'B. 返回', value: 'back' },
+        { name: '重新检测版本', value: 'refresh' },
+        { name: '返回', value: 'back' },
       ],
       pageSize: 10,
+      theme: {
+        indexMode: 'number',
+      },
     }])
 
     if (target === 'back') return
@@ -896,6 +922,27 @@ async function runManagedPackageMenu(
 
     const selected = statuses.find(item => item.id === target)
     if (!selected) continue
+
+    if (selected.openDirectly) {
+      console.log()
+      if (selected.externalUrl && await openExternalUrl(selected.externalUrl)) {
+        console.log(ansis.green(`  已尝试打开 ${selected.label} 项目页`))
+      }
+      else if (selected.externalUrl) {
+        console.log(ansis.yellow(`  未能自动打开浏览器，请手动访问 ${selected.externalUrl}`))
+      }
+      else {
+        console.log(ansis.red(`  ${selected.label} 未配置项目地址`))
+      }
+      console.log()
+
+      await inquirer.prompt([{
+        type: 'input',
+        name: 'continue',
+        message: ansis.gray(options.continueMessage),
+      }])
+      continue
+    }
 
     await manageSinglePackage(selected)
 
@@ -1065,6 +1112,7 @@ function printBaseEnvironmentStatusLines(statuses: BaseEnvironmentToolStatus[]):
   console.log()
   console.log(ansis.cyan.bold('  基础环境检测'))
   console.log(ansis.gray('  检测 Git、PowerShell、Node.js、Python、pnpm、uv、VS Code，并提供安装入口'))
+  console.log(ansis.gray('  菜单额外提供“科学上网”快捷入口，可直接打开相关文章'))
   console.log()
   console.log(ansis.gray(separator))
   console.log(ansis.cyan(header))
@@ -1132,13 +1180,13 @@ async function executeBaseEnvironmentInstallAction(
   console.log()
 }
 
-async function manageBaseEnvironmentTool(tool: BaseEnvironmentToolStatus): Promise<void> {
+async function manageBaseEnvironmentTool(tool: BaseEnvironmentToolStatus): Promise<boolean> {
   const choices = [
-    ...tool.installActions.map((action, index) => ({
-      name: `${index + 1}. ${action.label}`,
+    ...tool.installActions.map(action => ({
+      name: action.label,
       value: action.id,
     })),
-    { name: 'B. 返回', value: 'back' },
+    { name: '返回', value: 'back' },
   ]
 
   console.log()
@@ -1150,7 +1198,7 @@ async function manageBaseEnvironmentTool(tool: BaseEnvironmentToolStatus): Promi
   if (tool.installActions.length === 0) {
     console.log(ansis.gray('  当前平台暂未提供自动安装入口'))
     console.log()
-    return
+    return true
   }
 
   const { actionId } = await inquirer.prompt([{
@@ -1158,25 +1206,28 @@ async function manageBaseEnvironmentTool(tool: BaseEnvironmentToolStatus): Promi
     name: 'actionId',
     message: `选择 ${tool.label} 的操作`,
     choices,
+    theme: {
+      indexMode: 'number',
+    },
   }])
 
   if (actionId === 'back') {
-    return
+    return false
   }
 
   const selectedAction = tool.installActions.find(item => item.id === actionId)
   if (!selectedAction) {
-    return
+    return false
   }
 
   await executeBaseEnvironmentInstallAction(tool, selectedAction)
+  return true
 }
 
 async function runBaseEnvironmentMenu(): Promise<void> {
   while (true) {
     const statuses = await detectBaseEnvironmentStatuses()
     printBaseEnvironmentStatusLines(statuses)
-
     const { target } = await inquirer.prompt([{
       type: 'list',
       name: 'target',
@@ -1186,10 +1237,14 @@ async function runBaseEnvironmentMenu(): Promise<void> {
           name: formatBaseEnvironmentChoice(item),
           value: item.id,
         })),
-        { name: 'R. 重新检测版本', value: 'refresh' },
-        { name: 'B. 返回', value: 'back' },
+        { name: '打开网站：科学上网推荐列表', value: 'scientific-internet' },
+        { name: '重新检测版本', value: 'refresh' },
+        { name: '返回', value: 'back' },
       ],
       pageSize: 10,
+      theme: {
+        indexMode: 'number',
+      },
     }])
 
     if (target === 'back') {
@@ -1200,18 +1255,33 @@ async function runBaseEnvironmentMenu(): Promise<void> {
       continue
     }
 
+    if (target === 'scientific-internet') {
+      const opened = await openExternalUrl(SCIENTIFIC_INTERNET_GUIDE_URL)
+      console.log()
+      if (opened) {
+        console.log(ansis.green('  已尝试打开科学上网推荐列表'))
+      }
+      else {
+        console.log(ansis.yellow(`  未能自动打开浏览器，请手动访问 ${SCIENTIFIC_INTERNET_GUIDE_URL}`))
+      }
+      console.log()
+      continue
+    }
+
     const selected = statuses.find(item => item.id === target)
     if (!selected) {
       continue
     }
 
-    await manageBaseEnvironmentTool(selected)
+    const shouldPause = await manageBaseEnvironmentTool(selected)
 
-    await inquirer.prompt([{
-      type: 'input',
-      name: 'continue',
-      message: ansis.gray('按 Enter 返回基础环境检测菜单...'),
-    }])
+    if (shouldPause) {
+      await inquirer.prompt([{
+        type: 'input',
+        name: 'continue',
+        message: ansis.gray('按 Enter 返回基础环境检测菜单...'),
+      }])
+    }
   }
 }
 

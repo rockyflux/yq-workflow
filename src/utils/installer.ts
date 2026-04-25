@@ -90,6 +90,8 @@ export interface BaseEnvironmentToolStatus {
   installActions: BaseEnvironmentInstallAction[]
 }
 
+export const SCIENTIFIC_INTERNET_GUIDE_URL = 'https://www.ermao.net/posts/vpn/'
+
 type DetectionAttempt = {
   command: string
   args: string[]
