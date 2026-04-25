@@ -9,8 +9,8 @@ import { getAgentSkillsDir, getAllCommandIds, installWorkflows, showInstallSumma
 
 export async function init(options: InitOptions = {}): Promise<void> {
   console.log()
-  console.log(ansis.cyan.bold('  YQ Workflow Toolkit'))
-  console.log(ansis.gray('  安装 Claude Code 命令包、提示词与项目辅助能力'))
+  console.log(ansis.cyan.bold('  YQ AI 编程工具助手'))
+  console.log(ansis.gray('  安装工作流命令、提示词、技能与常用工具入口'))
   console.log(ansis.gray('  初始化仅安装工作流文件；API 请在主菜单单独配置'))
   console.log()
 

@@ -4,14 +4,15 @@ import ansis from 'ansis'
 import { version } from '../package.json'
 import { configMcp } from './commands/config-mcp'
 import { diagnoseMcp, fixMcp } from './commands/diagnose-mcp'
+import { closeHelpWebServer, startHelpWebServer } from './commands/help-web'
 import { init } from './commands/init'
-import { configApi, showMainMenu } from './commands/menu'
+import { configApi, configSkills, showHelp, showMainMenu } from './commands/menu'
 import { i18n, initI18n } from './i18n'
 
 function customizeHelp(sections: any[]): any[] {
   sections.unshift({
     title: '',
-    body: ansis.cyan.bold(`YQ Workflow Toolkit v${version}`),
+    body: ansis.cyan.bold(`YQ AI Coding Toolkit v${version}`),
   })
 
   sections.push({
@@ -20,6 +21,9 @@ function customizeHelp(sections: any[]): any[] {
       `  ${ansis.cyan('yq')}               ${i18n.t('cli:help.commandDescriptions.showMenu')}`,
       `  ${ansis.cyan('yq menu')}          ${i18n.t('cli:help.commandDescriptions.showMenu')}`,
       `  ${ansis.cyan('yq init')} | ${ansis.cyan('i')}      ${i18n.t('cli:help.commandDescriptions.initConfig')}`,
+      `  ${ansis.cyan('yq help')}          查看常用命令说明`,
+      `  ${ansis.cyan('yq config skills')} 打开 Skills 配置菜单`,
+      `  ${ansis.cyan('yq config skills-web')} 直接打开 Skills 网页帮助`,
       `  ${ansis.cyan('yq config mcp')}    ${i18n.t('cli:help.commandDescriptions.configMcp')}`,
       `  ${ansis.cyan('yq config api')}    打开 cc-switch 下载页`,
       `  ${ansis.cyan('yq diagnose-mcp')}  ${i18n.t('cli:help.commandDescriptions.diagnoseMcp')}`,
@@ -97,6 +101,12 @@ export async function setupCommands(cli: CAC): Promise<void> {
     })
 
   cli
+    .command('help', '查看帮助概览')
+    .action(async () => {
+      await showHelp()
+    })
+
+  cli
     .command('diagnose-mcp', i18n.t('cli:help.commandDescriptions.diagnoseMcp'))
     .action(async () => {
       await diagnoseMcp()
@@ -117,9 +127,24 @@ export async function setupCommands(cli: CAC): Promise<void> {
       else if (subcommand === 'api') {
         await configApi()
       }
+      else if (subcommand === 'skills') {
+        await configSkills()
+      }
+      else if (subcommand === 'skills-web') {
+        await startHelpWebServer({ openBrowser: true })
+      }
+      else if (subcommand === 'skills-web-close') {
+        const closed = await closeHelpWebServer()
+        if (closed) {
+          console.log(ansis.green('已关闭本地网页版 Skills'))
+        }
+        else {
+          console.log(ansis.gray('当前没有运行中的本地网页版 Skills'))
+        }
+      }
       else {
         console.log(ansis.red(i18n.t('common:unknownSubcommand', { subcommand })))
-        console.log(ansis.gray(i18n.t('common:availableSubcommands', { list: 'mcp, api' })))
+        console.log(ansis.gray(i18n.t('common:availableSubcommands', { list: 'mcp, api, skills, skills-web, skills-web-close' })))
       }
     })
 

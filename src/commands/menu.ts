@@ -3,14 +3,23 @@ import inquirer from 'inquirer'
 import fs from 'fs-extra'
 import { spawn } from 'node:child_process'
 import { homedir } from 'node:os'
+import ora from 'ora'
 import { join } from 'pathe'
 import { version } from '../../package.json'
 import { configMcp } from './config-mcp'
+import { closeHelpWebServer, getActiveHelpWebState, launchHelpWebDetached } from './help-web'
 import { init } from './init'
 import { update } from './update'
 import { buildDate } from '../generated/build-info'
 import { i18n } from '../i18n'
-import { collectSkills, getAgentSkillsDir, getWorkflowConfigs, uninstallWorkflows } from '../utils/installer'
+import {
+  collectSkills,
+  detectBaseEnvironmentToolStatuses,
+  getAgentSkillsDir,
+  listAgentSkillDirectories,
+  uninstallWorkflows,
+} from '../utils/installer'
+import type { BaseEnvironmentInstallAction, BaseEnvironmentToolStatus } from '../utils/installer'
 import { readCcgConfig, writeCcgConfig } from '../utils/config'
 import { PACKAGE_ROOT } from '../utils/installer-template'
 import { compareVersions, getGlobalPackageVersion, getLatestVersion } from '../utils/version'
@@ -18,51 +27,89 @@ import { compareVersions, getGlobalPackageVersion, getLatestVersion } from '../u
 type MenuAction =
   | 'init'
   | 'update'
+  | 'popular-workflows'
+  | 'skills'
   | 'mcp'
+  | 'environment'
   | 'api'
-  | 'style'
   | 'tools'
-  | 'install-claude'
-  | 'install-codex'
-  | 'check-updates'
+  | 'coding-tools'
   | 'help'
   | 'uninstall'
   | 'exit'
 
-type StyleId =
-  | 'default'
-  | 'engineer-professional'
-  | 'nekomata-engineer'
-  | 'laowang-engineer'
-  | 'ojousama-engineer'
-  | 'abyss-cultivator'
-  | 'abyss-concise'
-  | 'abyss-command'
-  | 'abyss-ritual'
-
-const STYLE_CHOICES: Array<{ name: string, value: StyleId, file?: string }> = [
-  { name: '默认 - Claude Code 原生风格', value: 'default' },
-  { name: '专业工程师 - 简洁专业的技术风格', value: 'engineer-professional', file: 'engineer-professional.md' },
-  { name: '猫娘工程师 - 可爱猫娘语气', value: 'nekomata-engineer', file: 'nekomata-engineer.md' },
-  { name: '老王工程师 - 接地气的老王风格', value: 'laowang-engineer', file: 'laowang-engineer.md' },
-  { name: '大小姐工程师 - 优雅大小姐语气', value: 'ojousama-engineer', file: 'ojousama-engineer.md' },
-  { name: '邪修风格 - 宿命深渊 · 道语标签', value: 'abyss-cultivator', file: 'abyss-cultivator.md' },
-  { name: '冷刃简报 - 保留邪修人格，更克制更短', value: 'abyss-concise', file: 'abyss-concise.md' },
-  { name: '铁律军令 - 命令式压缩输出', value: 'abyss-command', file: 'abyss-command.md' },
-  { name: '祭仪长卷 - 仪式感叙事张力', value: 'abyss-ritual', file: 'abyss-ritual.md' },
-]
-
 type ManagedPackage = {
+  id: string
   label: string
-  packageName: string
+  packageName?: string
+  description?: string
+  installType?: 'npm' | 'external-link'
+  externalUrl?: string
+  externalActionText?: string
+  statusHint?: string
+  tutorialUrl?: string
+  tutorialActionText?: string
+  runCommand?: {
+    command: string
+    args: string[]
+    successText?: string
+  }
 }
 
-const MANAGED_PACKAGES: ManagedPackage[] = [
-  { label: 'Claude Code', packageName: '@anthropic-ai/claude-code' },
-  { label: 'Codex', packageName: '@openai/codex' },
-  { label: 'CCR', packageName: '@musistudio/claude-code-router' },
-  { label: 'CCometixLine', packageName: '@cometix/ccline' },
+const CODING_TOOL_PACKAGES: ManagedPackage[] = [
+  { id: 'claude-code', label: 'Claude Code', packageName: '@anthropic-ai/claude-code' },
+  { id: 'codex', label: 'Codex', packageName: '@openai/codex' },
+  { id: 'gemini-cli', label: 'Gemini CLI', packageName: '@google/gemini-cli' },
+  { id: 'opencode', label: 'OpenCode', packageName: 'opencode-ai' },
+  {
+    id: 'mossx-client',
+    label: 'MossX 客户端',
+    installType: 'external-link',
+    externalUrl: 'https://www.mossx.ai/download',
+    externalActionText: '打开下载页',
+    statusHint: '桌面客户端下载',
+  },
 ]
+
+const CLAUDE_CODE_TOOL_PACKAGES: ManagedPackage[] = [
+  CODING_TOOL_PACKAGES[0],
+  { id: 'ccusage', label: 'ccusage', packageName: 'ccusage', runCommand: { command: 'npx', args: ['ccusage'], successText: '  ccusage 运行结束' } },
+  { id: 'ccr', label: 'CCR', packageName: '@musistudio/claude-code-router' },
+  { id: 'ccline', label: 'CCometixLine', packageName: '@cometix/ccline' },
+]
+
+const POPULAR_WORKFLOW_PACKAGES: ManagedPackage[] = [
+  {
+    id: 'get-shit-done',
+    label: 'GET SHIT DONE',
+    packageName: 'get-shit-done-cc',
+    description: '一个轻量但强大的元提示、上下文工程与规格驱动开发系统',
+    tutorialUrl: 'https://github.com/gsd-build/get-shit-done/blob/main/README.zh-CN.md',
+  },
+  {
+    id: 'gstack',
+    label: 'gstack',
+    description: '面向 AI Coding 的开源工作流集合，当前仅提供教程入口',
+    installType: 'external-link',
+    externalUrl: 'https://github.com/garrytan/gstack',
+    externalActionText: '打开教程',
+    tutorialUrl: 'https://github.com/garrytan/gstack',
+    tutorialActionText: '打开教程',
+    statusHint: '教程直达',
+  },
+  {
+    id: 'trellis',
+    label: 'Trellis',
+    packageName: '@mindfoldhq/trellis',
+    description: '给 AI 立规矩的开源框架',
+    tutorialUrl: 'https://github.com/mindfold-ai/Trellis/blob/main/README_CN.md',
+  },
+]
+
+type ManagedPackageStatus = ManagedPackage & {
+  installedVersion: string | null
+  latestVersion: string | null
+}
 
 const MENU_RESOURCES = [
   {
@@ -77,6 +124,8 @@ const MENU_RESOURCES = [
 
 const HEADER_INNER_WIDTH = 60
 const CC_SWITCH_RELEASES_URL = 'https://github.com/farion1231/cc-switch/releases'
+const SKILLS_SH_URL = 'https://skills.sh/'
+const MENU_SEPARATOR = '----------'
 
 type InstallStatus = {
   isInstalled: boolean
@@ -97,14 +146,15 @@ async function countInstalledCommands(): Promise<number> {
 }
 
 async function countInstalledSkills(): Promise<number> {
-  const [workflowSkills, yqSkills, baseSkills, superpowersSkills] = await Promise.all([
+  const [workflowSkills, yqSkills, baseSkills, superpowersSkills, externalAgentSkills] = await Promise.all([
     listInstalledWorkflowSkills(),
     listInstalledYqAgentSkills(),
     listInstalledBaseSkills(),
     listInstalledSuperpowersSkills(),
+    listInstalledExternalAgentSkills(),
   ])
 
-  return workflowSkills.length + yqSkills.length + baseSkills.length + superpowersSkills.length
+  return workflowSkills.length + yqSkills.length + baseSkills.length + superpowersSkills.length + externalAgentSkills.length
 }
 
 async function listInstalledCommands(): Promise<string[]> {
@@ -175,6 +225,27 @@ async function listInstalledSuperpowersSkills(): Promise<InstalledSkill[]> {
   return listInstalledSkillsFromTemplate('superpowers', 'superpowers')
 }
 
+async function listInstalledExternalAgentSkills(): Promise<InstalledSkill[]> {
+  const agentSkillsDir = getAgentSkillsDir()
+  if (!(await fs.pathExists(agentSkillsDir))) {
+    return []
+  }
+
+  const rootGroups = new Set(['yq', 'yq-base', 'superpowers'])
+
+  return collectSkills(agentSkillsDir)
+    .filter(skill => {
+      const normalizedPath = skill.relPath.replace(/\\/g, '/')
+      const rootGroup = normalizedPath.split('/')[0]
+      return !rootGroups.has(rootGroup)
+    })
+    .map(skill => ({
+      name: skill.name,
+      path: skill.skillPath,
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name))
+}
+
 function printInstalledSkillsSection(title: string, items: InstalledSkill[], emptyText: string): void {
   console.log()
   console.log(ansis.cyan(`  ${title}`))
@@ -188,8 +259,27 @@ function printInstalledSkillsSection(title: string, items: InstalledSkill[], emp
   }
 }
 
+function printSkillsStorageNotice(): void {
+  console.log(ansis.gray(`  技能存储在 ${getAgentSkillsDir()}，遵循 Agent Skills 开放标准。`))
+  console.log(ansis.gray('  兼容的工具：Claude Code、Codex、Gemini CLI 等'))
+  console.log()
+}
+
 function createHeaderLine(content = ''): string {
   return `║${content.padStart(Math.floor((HEADER_INNER_WIDTH + content.length) / 2)).padEnd(HEADER_INNER_WIDTH)}║`
+}
+
+function formatMenuChoice(label: string, description?: string): string {
+  if (!description) {
+    return label
+  }
+
+  const normalizedDescription = description.replace(/^\s*-\s*/u, '')
+  return `${label}  ${ansis.gray(`-  ${normalizedDescription}`)}`
+}
+
+function shouldPauseAfterMainMenuAction(action: MenuAction): boolean {
+  return !['mcp', 'skills', 'tools', 'coding-tools', 'environment', 'popular-workflows'].includes(action)
 }
 
 async function getInstallStatus(commandCount: number): Promise<InstallStatus> {
@@ -207,7 +297,7 @@ async function getInstallStatus(commandCount: number): Promise<InstallStatus> {
 }
 
 function printInstallStatus(status: InstallStatus): void {
-  console.log(ansis.cyan('  工作流状态'))
+  //console.log(ansis.cyan('  工作流状态'))
 
   const installedVersion = status.installedVersion
 
@@ -245,8 +335,8 @@ function drawHeader(commandCount: number, skillCount: number): void {
     createHeaderLine('   ██║   ╚██████╔╝'),
     createHeaderLine('   ╚═╝    ╚══▀▀═╝'),
     createHeaderLine(),
-    createHeaderLine('Claude Code Workflow Toolkit'),
-    createHeaderLine('Commands + Skills + MCP'),
+    createHeaderLine('AI Coding Toolkit'),
+    createHeaderLine('Workflow + Tools + MCP'),
     createHeaderLine(),
     createHeaderLine(`v${version} | ${commandCount} commands | ${skillCount} skills | zh-CN`),
     createHeaderLine(`build ${buildDate}`),
@@ -281,7 +371,7 @@ function resolveInteractiveCommand(command: string, args: string[]): { command: 
     }
   }
 
-  if (['npm', 'npx'].includes(command)) {
+  if (['npm', 'npx', 'pnpm', 'corepack'].includes(command)) {
     return {
       command: 'cmd',
       args: ['/c', command, ...args],
@@ -310,10 +400,10 @@ function runInteractiveCommand(command: string, args: string[]): Promise<void> {
 
 async function configApi(): Promise<void> {
   console.log()
-  console.log(ansis.cyan.bold('  下载 API 配置工具'))
+  console.log(ansis.cyan.bold('  下载模型 API 配置工具'))
   console.log()
-  console.log('  YQ 不再内置 API 配置逻辑。')
-  console.log(`  请手动下载 ${ansis.cyan('cc-switch')} 后完成 API 配置：`)
+  console.log('  YQ 不再内置模型 API 配置逻辑。')
+  console.log(`  请手动下载 ${ansis.cyan('cc-switch')} 后完成模型 API 配置：`)
   console.log(`  ${ansis.gray(CC_SWITCH_RELEASES_URL)}`)
   console.log()
 
@@ -341,109 +431,144 @@ export {
   configApi,
 }
 
-async function configStyle(): Promise<void> {
-  const config = await readCcgConfig()
-  const currentStyle = config?.general?.outputStyle || 'default'
-
-  const { style } = await inquirer.prompt([{
-    type: 'list',
-    name: 'style',
-    message: '选择输出风格',
-    choices: STYLE_CHOICES,
-    default: currentStyle,
-  }])
-
-  if (style === currentStyle) {
-    console.log()
-    console.log(ansis.gray('  风格未变更'))
-    console.log()
-    return
-  }
-
-  const styleDir = join(homedir(), '.claude', '.yq')
-  const styleFile = join(styleDir, 'output-style.md')
-  const selectedStyle = STYLE_CHOICES.find(item => item.value === style)
-
-  await fs.ensureDir(styleDir)
-  if (selectedStyle?.file) {
-    const source = join(PACKAGE_ROOT, 'templates', 'output-styles', selectedStyle.file)
-    if (await fs.pathExists(source)) {
-      await fs.copyFile(source, styleFile)
+async function openExternalUrl(url: string): Promise<boolean> {
+  try {
+    if (process.platform === 'win32') {
+      await runInteractiveCommand('start', [url])
     }
-  }
-  else if (await fs.pathExists(styleFile)) {
-    await fs.remove(styleFile)
-  }
+    else if (process.platform === 'darwin') {
+      await runInteractiveCommand('open', [url])
+    }
+    else {
+      await runInteractiveCommand('xdg-open', [url])
+    }
 
-  if (config) {
-    config.general.outputStyle = style
-    await writeCcgConfig(config)
+    return true
   }
-
-  console.log()
-  console.log(ansis.green(`  输出风格已设置为: ${selectedStyle?.name || style}`))
-  console.log(ansis.gray(`  ${styleFile}`))
-  console.log()
+  catch {
+    return false
+  }
 }
 
-async function runToolsMenu(): Promise<void> {
-  const { tool } = await inquirer.prompt([{
-    type: 'list',
-    name: 'tool',
-    message: '选择工具',
-    choices: [
-      { name: '1. ccusage - Claude Code 用量分析', value: 'ccusage' },
-      { name: '2. CCometixLine - 状态栏工具（Git + 用量）', value: 'ccline' },
-      { name: 'B. 返回', value: 'back' },
-    ],
-  }])
+async function showAgentSkillsDirectories(): Promise<void> {
+  const rootDir = getAgentSkillsDir()
+  const directories = await listAgentSkillDirectories(rootDir)
 
-  if (tool === 'back') return
+  console.log()
+  console.log(ansis.cyan.bold('  本地 Skills 目录'))
+  printSkillsStorageNotice()
 
-  if (tool === 'ccusage') {
+  if (directories.length === 0) {
+    console.log(ansis.gray('  暂未发现 Skills 目录'))
+    console.log(ansis.gray(`  ${rootDir}`))
     console.log()
-    console.log(ansis.cyan('  运行 ccusage...'))
-    console.log()
-    await runInteractiveCommand('npx', ['ccusage'])
     return
   }
 
-  const { cclineAction } = await inquirer.prompt([{
-    type: 'list',
-    name: 'cclineAction',
-    message: 'CCometixLine 操作',
-    choices: [
-      { name: '1. 安装 / 更新', value: 'install' },
-      { name: '2. 卸载', value: 'uninstall' },
-      { name: 'B. 返回', value: 'back' },
-    ],
-  }])
-
-  if (cclineAction === 'back') return
-
-  console.log()
-  if (cclineAction === 'install') {
-    console.log(ansis.cyan('  正在安装 CCometixLine...'))
-    await runInteractiveCommand('npm', ['install', '-g', '@cometix/ccline'])
-    console.log(ansis.green('  @cometix/ccline 安装成功'))
-    console.log(ansis.gray('  安装完成后会自动供 Claude Code 使用'))
-  }
-  else {
-    console.log(ansis.cyan('  正在卸载 CCometixLine...'))
-    await runInteractiveCommand('npm', ['uninstall', '-g', '@cometix/ccline'])
-    console.log(ansis.green('  @cometix/ccline 已卸载'))
+  console.log(ansis.cyan(`  共发现 ${directories.length} 个目录`))
+  for (const item of directories) {
+    console.log(`  ${ansis.green(item.relativePath.padEnd(32))} ${ansis.gray(item.path)}`)
   }
   console.log()
 }
 
-async function checkManagedPackageUpdates(): Promise<void> {
+async function listGlobalSkillsWithCli(): Promise<void> {
   console.log()
-  console.log(ansis.cyan.bold('  检查工具更新'))
-  console.log(ansis.gray('  检查并更新 Claude Code、Codex、CCR 和 CCometixLine'))
+  console.log(ansis.cyan.bold('  全局已安装 Skills'))
+  printSkillsStorageNotice()
+  console.log(ansis.gray(`  来源：${SKILLS_SH_URL}`))
+  console.log()
+  await runInteractiveCommand('npx', ['skills', 'list', '-g'])
+  console.log()
+}
+
+async function installSkillPackage(source: string): Promise<void> {
+  const normalizedSource = source.trim()
+  if (!normalizedSource) {
+    console.log()
+    console.log(ansis.gray('  已取消'))
+    console.log()
+    return
+  }
+
+  console.log()
+  console.log(ansis.cyan(`  正在安装 Skills: ${normalizedSource}`))
+  console.log(ansis.gray('  将调用 npx skills add，并安装到全局 Skills 目录'))
+  console.log()
+  await runInteractiveCommand('npx', ['skills', 'add', normalizedSource, '-g'])
+  console.log()
+}
+
+async function searchAndInstallSkills(): Promise<void> {
+  const { query } = await inquirer.prompt([{
+    type: 'input',
+    name: 'query',
+    message: '输入要检索的关键词',
+  }])
+
+  if (!query?.trim()) {
+    console.log()
+    console.log(ansis.gray('  已取消'))
+    console.log()
+    return
+  }
+
+  console.log()
+  console.log(ansis.cyan(`  正在检索 Skills.sh: ${query.trim()}`))
+  console.log(ansis.gray('  检索结果会由 skills 官方 CLI 直接输出'))
+  console.log()
+  await runInteractiveCommand('npx', ['skills', 'find', query.trim()])
   console.log()
 
-  const packages = await Promise.all(
-    MANAGED_PACKAGES.map(async item => {
+  const { source } = await inquirer.prompt([{
+    type: 'input',
+    name: 'source',
+    message: '输入 owner/repo 或 owner/repo@skill 继续安装，留空返回',
+  }])
+
+  if (!source?.trim()) {
+    console.log()
+    console.log(ansis.gray('  已返回'))
+    console.log()
+    return
+  }
+
+  await installSkillPackage(source)
+}
+
+async function updateGlobalSkills(): Promise<void> {
+  const { confirmUpdate } = await inquirer.prompt([{
+    type: 'confirm',
+    name: 'confirmUpdate',
+    message: '更新全局 Skills？',
+    default: true,
+  }])
+
+  if (!confirmUpdate) {
+    console.log()
+    console.log(ansis.gray('  已取消'))
+    console.log()
+    return
+  }
+
+  console.log()
+  console.log(ansis.cyan('  正在更新全局 Skills...'))
+  console.log()
+  await runInteractiveCommand('npx', ['skills', 'update', '-g', '-y'])
+  console.log()
+}
+
+async function getManagedPackageStatuses(packages: ManagedPackage[]): Promise<ManagedPackageStatus[]> {
+  return Promise.all(
+    packages.map(async item => {
+      if (item.installType === 'external-link' || !item.packageName) {
+        return {
+          ...item,
+          installedVersion: null,
+          latestVersion: item.statusHint || null,
+        }
+      }
+
       const [installedVersion, latestVersion] = await Promise.all([
         getGlobalPackageVersion(item.packageName),
         getLatestVersion(item.packageName),
@@ -456,8 +581,52 @@ async function checkManagedPackageUpdates(): Promise<void> {
       }
     }),
   )
+}
+
+async function detectManagedPackageStatuses(
+  packages: ManagedPackage[],
+  title: string,
+): Promise<ManagedPackageStatus[]> {
+  const spinner = ora(`正在检测${title}版本...`).start()
+
+  try {
+    const statuses = await getManagedPackageStatuses(packages)
+    spinner.succeed(`${title}版本检测完成`)
+    return statuses
+  }
+  catch (error) {
+    spinner.fail(`${title}版本检测失败`)
+    throw error
+  }
+}
+
+function printManagedPackageStatusLines(
+  packages: ManagedPackageStatus[],
+  options: {
+    title: string
+    subtitle: string
+  },
+): void {
+  console.log()
+  console.log(ansis.cyan.bold(`  ${options.title}`))
+  console.log(ansis.gray(`  ${options.subtitle}`))
+  console.log()
 
   for (const item of packages) {
+    if (item.installType === 'external-link') {
+      const statusText = item.latestVersion
+        ? ansis.green(item.latestVersion)
+        : ansis.gray('打开下载页')
+      console.log(`  ${ansis.cyan(item.label.padEnd(14))} ${statusText}`)
+      if (item.description) {
+        console.log(ansis.gray(`  ${' '.repeat(16)}${item.description}`))
+      }
+      if (item.tutorialUrl) {
+        console.log(ansis.gray(`  ${' '.repeat(16)}教程：${item.tutorialUrl}`))
+      }
+      continue
+    }
+
     const installedText = item.installedVersion
       ? ansis.yellow(`v${item.installedVersion}`)
       : ansis.gray('未安装')
@@ -465,145 +634,613 @@ async function checkManagedPackageUpdates(): Promise<void> {
       ? ansis.green(`v${item.latestVersion}`)
       : ansis.red('查询失败')
     console.log(`  ${ansis.cyan(item.label.padEnd(14))} 当前: ${installedText}  最新: ${latestText}`)
-  }
-
-  console.log()
-
-  const updatable = packages.filter(item =>
-    item.latestVersion
-    && (!item.installedVersion || compareVersions(item.latestVersion, item.installedVersion) > 0),
-  )
-
-  if (updatable.length === 0) {
-    console.log(ansis.green('  当前已是最新版本，或暂无可更新项目'))
-    console.log()
-    return
-  }
-
-  const { targets } = await inquirer.prompt([{
-    type: 'checkbox',
-    name: 'targets',
-    message: '选择要安装 / 更新的工具',
-    choices: updatable.map(item => ({
-      name: `${item.label} (${item.installedVersion ? `v${item.installedVersion}` : '未安装'} -> v${item.latestVersion})`,
-      value: item.packageName,
-      checked: true,
-    })),
-  }])
-
-  if (!targets.length) {
-    console.log()
-    console.log(ansis.gray('  已取消'))
-    console.log()
-    return
-  }
-
-  for (const packageName of targets as string[]) {
-    const item = updatable.find(entry => entry.packageName === packageName)
-    if (!item) continue
-
-    console.log()
-    console.log(ansis.cyan(`  正在更新 ${item.label}...`))
-    console.log()
-    await runInteractiveCommand('npm', ['install', '-g', `${item.packageName}@latest`])
-    console.log(ansis.green(`  ${item.label} 更新完成`))
-  }
-
-  console.log()
-}
-
-async function installClaudeCode(): Promise<void> {
-  const { confirmInstall } = await inquirer.prompt([{
-    type: 'confirm',
-    name: 'confirmInstall',
-    message: '使用 npm 全局安装 / 更新 Claude Code？',
-    default: true,
-  }])
-
-  if (!confirmInstall) {
-    console.log()
-    console.log(ansis.gray('  已取消'))
-    console.log()
-    return
-  }
-
-  console.log()
-  console.log(ansis.cyan('  正在安装 Claude Code...'))
-  console.log()
-  await runInteractiveCommand('npm', ['install', '-g', '@anthropic-ai/claude-code'])
-  console.log()
-  console.log(ansis.green('  Claude Code 安装成功'))
-  console.log(ansis.gray('  运行 claude 命令启动'))
-  console.log()
-}
-
-async function installCodex(): Promise<void> {
-  const { confirmInstall } = await inquirer.prompt([{
-    type: 'confirm',
-    name: 'confirmInstall',
-    message: '使用 npm 全局安装 / 更新 Codex？',
-    default: true,
-  }])
-
-  if (!confirmInstall) {
-    console.log()
-    console.log(ansis.gray('  已取消'))
-    console.log()
-    return
-  }
-
-  console.log()
-  console.log(ansis.cyan('  正在安装 Codex...'))
-  console.log()
-  await runInteractiveCommand('npm', ['install', '-g', '@openai/codex'])
-  console.log()
-  console.log(ansis.green('  Codex 安装成功'))
-  console.log(ansis.gray('  运行 codex 命令启动'))
-  console.log()
-}
-
-async function showHelp(): Promise<void> {
-  const [installedCommands, installedWorkflowSkills, installedSkills, installedBaseSkills, installedSuperpowers] = await Promise.all([
-    listInstalledCommands(),
-    listInstalledWorkflowSkills(),
-    listInstalledYqAgentSkills(),
-    listInstalledBaseSkills(),
-    listInstalledSuperpowersSkills(),
-  ])
-
-  console.log()
-  console.log(ansis.cyan.bold('  已安装项概览'))
-  console.log()
-
-  console.log(ansis.cyan('  命令'))
-  if (installedCommands.length === 0) {
-    console.log(ansis.gray('    暂未发现已安装命令'))
-  }
-  else {
-    const workflowMap = new Map(
-      getWorkflowConfigs().flatMap(workflow =>
-        workflow.commands.map(command => [command, workflow.description || ''] as const),
-      ),
-    )
-
-    for (const command of installedCommands) {
-      const description = workflowMap.get(command) || ''
-      console.log(`  ${ansis.green(`/yq:${command}`.padEnd(24))} ${ansis.gray(description)}`)
+    if (item.description) {
+      console.log(ansis.gray(`  ${' '.repeat(16)}${item.description}`))
+    }
+    if (item.tutorialUrl) {
+      console.log(ansis.gray(`  ${' '.repeat(16)}教程：${item.tutorialUrl}`))
     }
   }
 
-  printInstalledSkillsSection('Workflow Skills', installedWorkflowSkills, '暂未发现已安装 workflow skills')
-  printInstalledSkillsSection('Skills', installedSkills, '暂未发现已安装 yq-skills')
-  printInstalledSkillsSection('Base Skills', installedBaseSkills, '暂未发现已安装 yq-base skills')
-  printInstalledSkillsSection('Superpowers', installedSuperpowers, '暂未发现已安装 superpowers')
   console.log()
 }
 
-async function uninstall(): Promise<void> {
+function formatManagedPackageChoice(item: ManagedPackageStatus): string {
+  if (item.installType === 'external-link') {
+    const description = item.description ? `；${item.description}` : ''
+    return `${item.label}  ${ansis.gray(`- ${item.latestVersion || '桌面客户端下载'}${description}`)}`
+  }
+
+  const currentText = item.installedVersion ? `当前 v${item.installedVersion}` : '未安装'
+  const latestText = item.latestVersion ? `最新 v${item.latestVersion}` : '最新查询失败'
+  const description = item.description ? `；${item.description}` : ''
+  return `${item.label}  ${ansis.gray(`- ${currentText} / ${latestText}${description}`)}`
+}
+
+function getPackageActionLabel(item: ManagedPackageStatus): string {
+  if (item.installType === 'external-link') {
+    return item.externalActionText || '打开下载页'
+  }
+
+  if (!item.installedVersion) {
+    return '安装最新版本'
+  }
+
+  if (!item.latestVersion) {
+    return '重新安装'
+  }
+
+  return compareVersions(item.latestVersion, item.installedVersion) > 0
+    ? '更新到最新版本'
+    : '重新安装当前最新版本'
+}
+
+async function installOrUpdateManagedPackage(item: ManagedPackageStatus): Promise<void> {
+  if (item.installType === 'external-link') {
+    const url = item.externalUrl
+    if (!url) {
+      console.log()
+      console.log(ansis.red(`  ${item.label} 未配置下载地址`))
+      console.log()
+      return
+    }
+
+    const actionText = item.externalActionText || '打开下载页'
+    const { confirmOpen } = await inquirer.prompt([{
+      type: 'confirm',
+      name: 'confirmOpen',
+      message: `${actionText}：${item.label}？`,
+      default: true,
+    }])
+
+    if (!confirmOpen) {
+      console.log()
+      console.log(ansis.gray('  已取消'))
+      console.log()
+      return
+    }
+
+    console.log()
+    const opened = await openExternalUrl(url)
+    if (opened) {
+      console.log(ansis.green(`  已尝试打开 ${item.label} 下载页`))
+    }
+    else {
+      console.log(ansis.yellow(`  未能自动打开浏览器，请手动访问 ${url}`))
+    }
+    console.log()
+    return
+  }
+
+  const actionLabel = getPackageActionLabel(item)
+  const currentText = item.installedVersion ? `v${item.installedVersion}` : '未安装'
+  const latestText = item.latestVersion ? `v${item.latestVersion}` : '未知'
+
+  const { confirmInstall } = await inquirer.prompt([{
+    type: 'confirm',
+    name: 'confirmInstall',
+    message: `${actionLabel} ${item.label}？（当前 ${currentText}，最新 ${latestText}）`,
+    default: true,
+  }])
+
+  if (!confirmInstall) {
+    console.log()
+    console.log(ansis.gray('  已取消'))
+    console.log()
+    return
+  }
+
+  console.log()
+  console.log(ansis.cyan(`  正在处理 ${item.label}...`))
+  console.log()
+  await runInteractiveCommand('npm', ['install', '-g', `${item.packageName}@latest`])
+  console.log(ansis.green(`  ${item.label} 已安装 / 更新完成`))
+  console.log()
+}
+
+async function uninstallManagedPackage(item: ManagedPackageStatus): Promise<void> {
+  if (item.installType === 'external-link') {
+    console.log()
+    console.log(ansis.gray(`  ${item.label} 为外部桌面客户端，请在系统应用管理中卸载`))
+    console.log()
+    return
+  }
+
+  if (!item.installedVersion) {
+    console.log()
+    console.log(ansis.gray(`  ${item.label} 当前未安装`))
+    console.log()
+    return
+  }
+
+  const { confirmUninstall } = await inquirer.prompt([{
+    type: 'confirm',
+    name: 'confirmUninstall',
+    message: `卸载 ${item.label}？（当前 v${item.installedVersion}）`,
+    default: false,
+  }])
+
+  if (!confirmUninstall) {
+    console.log()
+    console.log(ansis.gray('  已取消'))
+    console.log()
+    return
+  }
+
+  console.log()
+  console.log(ansis.cyan(`  正在卸载 ${item.label}...`))
+  console.log()
+  if (!item.packageName) {
+    throw new Error(`${item.label} 缺少 npm 包名配置`)
+  }
+  await runInteractiveCommand('npm', ['uninstall', '-g', item.packageName])
+  console.log(ansis.green(`  ${item.label} 已卸载`))
+  console.log()
+}
+
+async function runManagedPackage(item: ManagedPackageStatus): Promise<void> {
+  if (!item.runCommand) {
+    return
+  }
+
+  console.log()
+  console.log(ansis.cyan(`  正在运行 ${item.label}...`))
+  console.log()
+  await runInteractiveCommand(item.runCommand.command, item.runCommand.args)
+  if (item.runCommand.successText) {
+    console.log(ansis.green(item.runCommand.successText))
+  }
+  console.log()
+}
+
+async function openManagedPackageTutorial(item: ManagedPackageStatus): Promise<void> {
+  const url = item.tutorialUrl
+  if (!url) {
+    console.log()
+    console.log(ansis.gray(`  ${item.label} 暂未配置教程地址`))
+    console.log()
+    return
+  }
+
+  const actionText = item.tutorialActionText || '打开教程'
+  const { confirmOpen } = await inquirer.prompt([{
+    type: 'confirm',
+    name: 'confirmOpen',
+    message: `${actionText}：${item.label}？`,
+    default: true,
+  }])
+
+  if (!confirmOpen) {
+    console.log()
+    console.log(ansis.gray('  已取消'))
+    console.log()
+    return
+  }
+
+  console.log()
+  const opened = await openExternalUrl(url)
+  if (opened) {
+    console.log(ansis.green(`  已尝试打开 ${item.label} 教程`))
+  }
+  else {
+    console.log(ansis.yellow(`  未能自动打开浏览器，请手动访问 ${url}`))
+  }
+  console.log()
+}
+
+async function manageSinglePackage(item: ManagedPackageStatus): Promise<void> {
+  const installLabel = getPackageActionLabel(item)
+  const choices = [
+    { name: `1. ${installLabel}`, value: 'install' },
+    ...(item.installedVersion && item.installType !== 'external-link' ? [{ name: '2. 卸载', value: 'uninstall' }] : []),
+    ...(item.runCommand ? [{ name: item.installedVersion ? '3. 运行' : '3. 运行（npx）', value: 'run' }] : []),
+    ...(item.tutorialUrl && item.tutorialUrl !== item.externalUrl ? [{ name: '4. 打开教程', value: 'tutorial' }] : []),
+    { name: 'B. 返回', value: 'back' },
+  ]
+
+  const { action } = await inquirer.prompt([{
+    type: 'list',
+    name: 'action',
+    message: `选择 ${item.label} 的操作`,
+    choices,
+  }])
+
+  if (action === 'install') {
+    await installOrUpdateManagedPackage(item)
+  }
+  else if (action === 'uninstall') {
+    await uninstallManagedPackage(item)
+  }
+  else if (action === 'run') {
+    await runManagedPackage(item)
+  }
+  else if (action === 'tutorial') {
+    await openManagedPackageTutorial(item)
+  }
+}
+
+async function runManagedPackageMenu(
+  packages: ManagedPackage[],
+  options: {
+    title: string
+    subtitle: string
+    selectMessage: string
+    continueMessage: string
+  },
+): Promise<void> {
+  while (true) {
+    const statuses = await detectManagedPackageStatuses(packages, options.title)
+
+    printManagedPackageStatusLines(statuses, {
+      title: options.title,
+      subtitle: options.subtitle,
+    })
+
+    const { target } = await inquirer.prompt([{
+      type: 'list',
+      name: 'target',
+      message: options.selectMessage,
+      choices: [
+        ...statuses.map(item => ({
+          name: formatManagedPackageChoice(item),
+          value: item.id,
+        })),
+        { name: 'R. 重新检测版本', value: 'refresh' },
+        { name: 'B. 返回', value: 'back' },
+      ],
+      pageSize: 10,
+    }])
+
+    if (target === 'back') return
+    if (target === 'refresh') continue
+
+    const selected = statuses.find(item => item.id === target)
+    if (!selected) continue
+
+    await manageSinglePackage(selected)
+
+    await inquirer.prompt([{
+      type: 'input',
+      name: 'continue',
+      message: ansis.gray(options.continueMessage),
+    }])
+  }
+}
+
+export async function configSkills(): Promise<void> {
+  while (true) {
+    const activeHelpWeb = await getActiveHelpWebState()
+    console.log()
+    console.log(ansis.cyan.bold('  配置 Skills'))
+    printSkillsStorageNotice()
+    console.log(ansis.gray(`  已集成 Skills 官方目录与 CLI：${SKILLS_SH_URL}`))
+    if (activeHelpWeb) {
+      console.log(ansis.green(`  本地网页版 Skills 运行中：${activeHelpWeb.url}`))
+    }
+    console.log()
+
+    const { action } = await inquirer.prompt([{
+      type: 'list',
+      name: 'action',
+      message: '选择 Skills 操作',
+      pageSize: 12,
+      choices: [
+        { name: '1. 本地网页版 Skills', value: 'web' },
+        { name: '2. 关闭本地网页版 Skills', value: 'web-close' },
+        { name: '3. 查看本地 Skills 目录', value: 'dirs' },
+        { name: '4. 查看全局已安装 Skills', value: 'list' },
+        { name: '5. 检索并安装 Skills.sh 技能', value: 'search' },
+        { name: '6. 安装指定 Skills 包 / 单个 Skill', value: 'install' },
+        { name: '7. 更新全局 Skills', value: 'update' },
+        { name: '8. 打开 skills.sh', value: 'open' },
+        { name: 'B. 返回', value: 'back' },
+      ],
+    }])
+
+    if (action === 'back') return
+
+    if (action === 'web') {
+      const result = await launchHelpWebDetached('agents')
+      console.log()
+      if (result.status === 'reused') {
+        console.log(ansis.green(`  已复用已打开的本地网页版 Skills：${result.url}`))
+      }
+      else {
+        console.log(ansis.green('  已尝试打开本地网页版 Skills，默认目录为 .agents/skills'))
+      }
+      console.log(ansis.gray('  如未自动打开，请执行 yq config skills-web'))
+      console.log()
+    }
+    else if (action === 'web-close') {
+      const closed = await closeHelpWebServer()
+      console.log()
+      if (closed) {
+        console.log(ansis.green('  已关闭本地网页版 Skills'))
+      }
+      else {
+        console.log(ansis.gray('  当前没有运行中的本地网页版 Skills'))
+      }
+      console.log()
+    }
+    else if (action === 'dirs') {
+      await showAgentSkillsDirectories()
+    }
+    else if (action === 'list') {
+      await listGlobalSkillsWithCli()
+    }
+    else if (action === 'search') {
+      await searchAndInstallSkills()
+    }
+    else if (action === 'install') {
+      const { source } = await inquirer.prompt([{
+        type: 'input',
+        name: 'source',
+        message: '输入 owner/repo 或 owner/repo@skill',
+      }])
+
+      await installSkillPackage(source || '')
+    }
+    else if (action === 'update') {
+      await updateGlobalSkills()
+    }
+    else {
+      const opened = await openExternalUrl(SKILLS_SH_URL)
+      console.log()
+      if (opened) {
+        console.log(ansis.green('  已尝试打开 skills.sh'))
+      }
+      else {
+        console.log(ansis.yellow(`  未能自动打开浏览器，请手动访问 ${SKILLS_SH_URL}`))
+      }
+      console.log()
+    }
+
+    await inquirer.prompt([{
+      type: 'input',
+      name: 'continue',
+      message: ansis.gray('按 Enter 返回 Skills 菜单...'),
+    }])
+  }
+}
+
+async function runCodingToolsMenu(): Promise<void> {
+  await runManagedPackageMenu(CODING_TOOL_PACKAGES, {
+    title: '安装编程工具',
+    subtitle: '统一管理 Claude Code、Codex、Gemini CLI、OpenCode 与 MossX 客户端',
+    selectMessage: '选择要管理的编程工具',
+    continueMessage: '按 Enter 返回编程工具菜单...',
+  })
+}
+
+async function runClaudeCodeToolsMenu(): Promise<void> {
+  await runManagedPackageMenu(CLAUDE_CODE_TOOL_PACKAGES, {
+    title: 'Claude Code 工具',
+    subtitle: '统一管理 Claude Code、ccusage、CCR 与 CCometixLine',
+    selectMessage: '选择要管理的 Claude Code 工具',
+    continueMessage: '按 Enter 返回 Claude Code 工具菜单...',
+  })
+}
+
+async function runPopularWorkflowsMenu(): Promise<void> {
+  await runManagedPackageMenu(POPULAR_WORKFLOW_PACKAGES, {
+    title: '热门开源工作流',
+    subtitle: '查看热门开源工作流的安装状态、版本、描述与教程入口',
+    selectMessage: '选择要管理的热门开源工作流',
+    continueMessage: '按 Enter 返回热门开源工作流菜单...',
+  })
+}
+
+async function detectBaseEnvironmentStatuses(): Promise<BaseEnvironmentToolStatus[]> {
+  const spinner = ora('正在检测基础环境版本...').start()
+
+  try {
+    const statuses = await detectBaseEnvironmentToolStatuses()
+    spinner.succeed('基础环境检测完成')
+    return statuses
+  }
+  catch (error) {
+    spinner.fail('基础环境检测失败')
+    throw error
+  }
+}
+
+function padTableCell(value: string, width: number): string {
+  if (value.length <= width) {
+    return value.padEnd(width)
+  }
+
+  return `${value.slice(0, Math.max(0, width - 1))}…`
+}
+
+function printBaseEnvironmentStatusLines(statuses: BaseEnvironmentToolStatus[]): void {
+  const columns = {
+    label: 14,
+    status: 8,
+    version: 14,
+    detail: 40,
+  }
+  const separator = `  +-${'-'.repeat(columns.label)}-+-${'-'.repeat(columns.status)}-+-${'-'.repeat(columns.version)}-+-${'-'.repeat(columns.detail)}-+`
+  const header = `  | ${padTableCell('工具', columns.label)} | ${padTableCell('状态', columns.status)} | ${padTableCell('版本', columns.version)} | ${padTableCell('说明', columns.detail)} |`
+
+  console.log()
+  console.log(ansis.cyan.bold('  基础环境检测'))
+  console.log(ansis.gray('  检测 Git、PowerShell、Node.js、Python、pnpm、uv、VS Code，并提供安装入口'))
+  console.log()
+  console.log(ansis.gray(separator))
+  console.log(ansis.cyan(header))
+  console.log(ansis.gray(separator))
+
+  for (const item of statuses) {
+    const row = `  | ${padTableCell(item.label, columns.label)} | ${padTableCell(item.installed ? '已安装' : '缺失', columns.status)} | ${padTableCell(item.version ? `v${item.version}` : '-', columns.version)} | ${padTableCell(item.detail, columns.detail)} |`
+    console.log(row)
+  }
+
+  console.log(ansis.gray(separator))
+  console.log()
+}
+
+function formatBaseEnvironmentChoice(item: BaseEnvironmentToolStatus): string {
+  const statusText = item.version ? `当前 v${item.version}` : '未检测到'
+  return `${item.label}  ${ansis.gray(`- ${statusText}；${item.detail}`)}`
+}
+
+async function executeBaseEnvironmentInstallAction(
+  tool: BaseEnvironmentToolStatus,
+  action: BaseEnvironmentInstallAction,
+): Promise<void> {
+  if (action.type === 'link') {
+    const opened = action.url ? await openExternalUrl(action.url) : false
+    console.log()
+    if (opened) {
+      console.log(ansis.green(`  已尝试打开 ${tool.label} 安装页面`))
+    }
+    else {
+      console.log(ansis.yellow(`  未能自动打开浏览器，请手动访问 ${action.url}`))
+    }
+    console.log()
+    return
+  }
+
+  const command = action.command
+  const args = action.args || []
+  if (!command) {
+    console.log()
+    console.log(ansis.red(`  ${tool.label} 缺少可执行安装命令`))
+    console.log()
+    return
+  }
+
+  const { confirmed } = await inquirer.prompt([{
+    type: 'confirm',
+    name: 'confirmed',
+    message: `${action.label}：${tool.label}？`,
+    default: true,
+  }])
+
+  if (!confirmed) {
+    console.log()
+    console.log(ansis.gray('  已取消'))
+    console.log()
+    return
+  }
+
+  console.log()
+  console.log(ansis.cyan(`  正在处理 ${tool.label}...`))
+  console.log()
+  await runInteractiveCommand(command, args)
+  console.log(ansis.green(`  ${action.successText || `${tool.label} 操作已执行完成`}`))
+  console.log()
+}
+
+async function manageBaseEnvironmentTool(tool: BaseEnvironmentToolStatus): Promise<void> {
+  const choices = [
+    ...tool.installActions.map((action, index) => ({
+      name: `${index + 1}. ${action.label}`,
+      value: action.id,
+    })),
+    { name: 'B. 返回', value: 'back' },
+  ]
+
+  console.log()
+  console.log(ansis.cyan.bold(`  ${tool.label}`))
+  console.log(ansis.gray(`  ${tool.detail}`))
+  console.log(ansis.gray(`  ${tool.description}`))
+  console.log()
+
+  if (tool.installActions.length === 0) {
+    console.log(ansis.gray('  当前平台暂未提供自动安装入口'))
+    console.log()
+    return
+  }
+
+  const { actionId } = await inquirer.prompt([{
+    type: 'list',
+    name: 'actionId',
+    message: `选择 ${tool.label} 的操作`,
+    choices,
+  }])
+
+  if (actionId === 'back') {
+    return
+  }
+
+  const selectedAction = tool.installActions.find(item => item.id === actionId)
+  if (!selectedAction) {
+    return
+  }
+
+  await executeBaseEnvironmentInstallAction(tool, selectedAction)
+}
+
+async function runBaseEnvironmentMenu(): Promise<void> {
+  while (true) {
+    const statuses = await detectBaseEnvironmentStatuses()
+    printBaseEnvironmentStatusLines(statuses)
+
+    const { target } = await inquirer.prompt([{
+      type: 'list',
+      name: 'target',
+      message: '选择要查看或安装的基础环境',
+      choices: [
+        ...statuses.map(item => ({
+          name: formatBaseEnvironmentChoice(item),
+          value: item.id,
+        })),
+        { name: 'R. 重新检测版本', value: 'refresh' },
+        { name: 'B. 返回', value: 'back' },
+      ],
+      pageSize: 10,
+    }])
+
+    if (target === 'back') {
+      return
+    }
+
+    if (target === 'refresh') {
+      continue
+    }
+
+    const selected = statuses.find(item => item.id === target)
+    if (!selected) {
+      continue
+    }
+
+    await manageBaseEnvironmentTool(selected)
+
+    await inquirer.prompt([{
+      type: 'input',
+      name: 'continue',
+      message: ansis.gray('按 Enter 返回基础环境检测菜单...'),
+    }])
+  }
+}
+
+export async function showHelp(): Promise<void> {
+  console.log()
+  console.log(ansis.cyan.bold('  常用命令'))
+  console.log()
+  console.log(`  ${ansis.green('npx yq-workflow'.padEnd(28))} ${ansis.gray('打开主菜单')}`)
+  console.log(`  ${ansis.green('npx yq-workflow menu'.padEnd(28))} ${ansis.gray('打开主菜单')}`)
+  console.log(`  ${ansis.green('npx yq-workflow init'.padEnd(28))} ${ansis.gray('初始化 / 重装工作流')}`)
+  console.log(`  ${ansis.green('npx yq-workflow update'.padEnd(28))} ${ansis.gray('更新工作流')}`)
+  console.log(`  ${ansis.green('npx yq-workflow help'.padEnd(28))} ${ansis.gray('查看常用命令说明')}`)
+  console.log(`  ${ansis.green('npx yq-workflow config skills'.padEnd(28))} ${ansis.gray('打开 Skills 配置菜单')}`)
+  console.log(`  ${ansis.green('npx yq-workflow config skills-web'.padEnd(28))} ${ansis.gray('直接打开本地网页版 Skills')}`)
+  console.log(`  ${ansis.green('npx yq-workflow config mcp'.padEnd(28))} ${ansis.gray('配置 MCP')}`)
+  console.log(`  ${ansis.green('npx yq-workflow config api'.padEnd(28))} ${ansis.gray('打开 cc-switch 下载页')}`)
+  console.log(`  ${ansis.green('npx yq-workflow diagnose-mcp'.padEnd(28))} ${ansis.gray('诊断 MCP 配置')}`)
+  console.log(`  ${ansis.green('npx yq-workflow fix-mcp'.padEnd(28))} ${ansis.gray('修复 MCP 配置')}`)
+  console.log()
+  console.log(ansis.cyan('  提示'))
+  console.log(ansis.gray('  Skills 的网页浏览、目录查看、安装与更新，请进入“配置 Skills”。'))
+  console.log()
+}
+
+async function uninstall(): Promise<boolean> {
   const { confirm } = await inquirer.prompt([{
     type: 'confirm',
     name: 'confirm',
-    message: '确定卸载 YQ 工作流文件？',
+    message: '确定卸载和删除配置？',
     default: false,
   }])
 
@@ -611,7 +1248,7 @@ async function uninstall(): Promise<void> {
     console.log()
     console.log(ansis.gray(i18n.t('common:cancelled')))
     console.log()
-    return
+    return false
   }
 
   const installDir = join(homedir(), '.claude')
@@ -622,9 +1259,10 @@ async function uninstall(): Promise<void> {
   }
 
   console.log()
-  console.log(ansis.green('  YQ 工作流文件已移除'))
+  console.log(ansis.green('  YQ 工作流与配置已移除'))
   console.log(ansis.gray(`  移除命令数: ${result.removedCommands.length}`))
   console.log(ansis.gray(`  移除技能数: ${result.removedSkills.length}`))
+  console.log(ansis.gray(`  删除 yq-workflow: ${result.removedGlobalPackage ? '已执行' : '未执行成功'}`))
   if (result.errors.length > 0) {
     console.log(ansis.yellow('  卸载告警:'))
     for (const error of result.errors) {
@@ -632,6 +1270,7 @@ async function uninstall(): Promise<void> {
     }
   }
   console.log()
+  return true
 }
 
 export async function showMainMenu(): Promise<void> {
@@ -651,21 +1290,21 @@ export async function showMainMenu(): Promise<void> {
       message: 'YQ 主菜单',
       pageSize: 16,
       choices: [
-        new inquirer.Separator('────────────── Claude Code ──────────────'),
-        { name: '1. 初始化 / 重装工作流      - 安装 YQ 工作流', value: 'init' },
-        { name: '2. 更新工作流               - 更新到最新版本', value: 'update' },
-        { name: '3. 配置 MCP                 - 必装 / 数据库 / Git / 文件资源', value: 'mcp' },
-        { name: '4. 配置 API                 - 打开 cc-switch 下载页', value: 'api' },
-        { name: '5. 配置输出风格             - 选择常用输出人格', value: 'style' },
-        new inquirer.Separator('─────────────── 其他工具 ────────────────'),
-        { name: 'T. 实用工具                 - ccusage, CCometixLine', value: 'tools' },
-        { name: 'C. 安装 Claude Code         - 安装 / 更新 CLI', value: 'install-claude' },
-        { name: 'D. 安装 Codex               - 安装 / 更新 CLI', value: 'install-codex' },
-        new inquirer.Separator('────────────────── YQ ───────────────────'),
-        { name: 'H. 帮助                     - 查看已安装命令和Skills', value: 'help' },
-        { name: 'U. 检查更新                 - 检查并更新 Claude Code、Codex、CCR、CCometixLine', value: 'check-updates' },
-        { name: '-. 卸载 YQ                  - 移除工作流文件', value: 'uninstall' },
-        new inquirer.Separator('─────────────────────────────────────────'),
+        new inquirer.Separator(`${MENU_SEPARATOR} 核心工作流 ${MENU_SEPARATOR}`),
+        { name: formatMenuChoice('1. 初始化 / 重装工作流', '- 安装 YQ 工作流'), value: 'init' },
+        { name: formatMenuChoice('2. 更新工作流', '- 更新到最新版本'), value: 'update' },
+        { name: formatMenuChoice('3. 热门开源工作流', '- GET SHIT DONE / gstack / Trellis'), value: 'popular-workflows' },
+        { name: formatMenuChoice('4. 配置 Skills', '- Skills.sh + 本地 Skills 目录'), value: 'skills' },
+        { name: formatMenuChoice('5. 配置 MCP', '- 必装 / 数据库 / Git / 文件资源'), value: 'mcp' },
+        new inquirer.Separator(`${MENU_SEPARATOR} 编程工具 ${MENU_SEPARATOR}`),
+        { name: formatMenuChoice('T. Claude Code 工具', '- Claude Code, ccusage, CCR, CCometixLine'), value: 'tools' },
+        { name: formatMenuChoice('E. 基础环境检测', '- Git, PowerShell, Node.js, Python, pnpm, uv, VS Code'), value: 'environment' },
+        { name: formatMenuChoice('C. 安装编程工具', '- Claude Code, Codex, Gemini, OpenCode, MossX'), value: 'coding-tools' },
+        { name: formatMenuChoice('A. 配置模型 API', '- 打开 cc-switch 下载页'), value: 'api' },
+        new inquirer.Separator(`${MENU_SEPARATOR} YQ ${MENU_SEPARATOR}`),
+        { name: formatMenuChoice('H. 帮助', '- 查看已安装命令、Skills 与工具'), value: 'help' },
+        { name: formatMenuChoice('-. 卸载和删除配置', '- 移除工作流文件并删除 yq-workflow'), value: 'uninstall' },
+        new inquirer.Separator('-'.repeat(41)),
         { name: 'Q. 退出', value: 'exit' },
       ],
     }])
@@ -677,32 +1316,36 @@ export async function showMainMenu(): Promise<void> {
       case 'update':
         await update()
         break
+      case 'popular-workflows':
+        await runPopularWorkflowsMenu()
+        break
       case 'mcp':
         await configMcp()
+        break
+      case 'skills':
+        await configSkills()
         break
       case 'api':
         await configApi()
         break
-      case 'style':
-        await configStyle()
-        break
       case 'tools':
-        await runToolsMenu()
+        await runClaudeCodeToolsMenu()
         break
-      case 'install-claude':
-        await installClaudeCode()
+      case 'environment':
+        await runBaseEnvironmentMenu()
         break
-      case 'install-codex':
-        await installCodex()
-        break
-      case 'check-updates':
-        await checkManagedPackageUpdates()
+      case 'coding-tools':
+        await runCodingToolsMenu()
         break
       case 'help':
         await showHelp()
         break
       case 'uninstall':
-        await uninstall()
+        if (await uninstall()) {
+          console.log(ansis.gray(`  ${i18n.t('common:goodbye')}`))
+          console.log()
+          return
+        }
         break
       case 'exit':
         console.log()
@@ -716,10 +1359,12 @@ export async function showMainMenu(): Promise<void> {
       await writeCcgConfig(currentConfig)
     }
 
-    await inquirer.prompt([{
-      type: 'input',
-      name: 'continue',
-      message: ansis.gray(i18n.t('common:pressEnterToReturn')),
-    }])
+    if (shouldPauseAfterMainMenuAction(action as MenuAction)) {
+      await inquirer.prompt([{
+        type: 'input',
+        name: 'continue',
+        message: ansis.gray(i18n.t('common:pressEnterToReturn')),
+      }])
+    }
   }
 }

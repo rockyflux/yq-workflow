@@ -6,7 +6,6 @@ export interface CcgConfig {
   general: {
     version: string
     language: SupportedLang
-    outputStyle?: string
     createdAt: string
   }
   workflows: {

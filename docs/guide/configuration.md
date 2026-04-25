@@ -24,6 +24,10 @@ npx yq-workflow
 npx yq-workflow menu
 npx yq-workflow init
 npx yq-workflow update
+npx yq-workflow help
+npx yq-workflow config skills
+npx yq-workflow config skills-web
+npx yq-workflow config skills-web-close
 npx yq-workflow config mcp
 npx yq-workflow config api
 npx yq-workflow diagnose-mcp
@@ -34,13 +38,15 @@ npx yq-workflow diagnose-mcp
 - 工作流安装 / 重装
 - 工作流更新
 - MCP 配置
-- API 配置
+- API 配置工具下载入口（跳转 `cc-switch` releases，手动完成配置）
 - 输出风格选择
 - 实用工具：`ccusage`、`CCometixLine`
-- Claude Code 安装 / 更新
-- Codex 安装 / 更新
+- 安装编程工具：统一管理 Claude Code、Codex、Gemini CLI、OpenCode，并展示当前 / 最新版本
 - 工具更新检查：`Claude Code`、`Codex`、`CCR`、`CCometixLine`
-- 帮助页：分别展示已安装 `/yq:*` 命令与已安装 `yq-skills`
+- 配置 Skills：第一个入口就是“本地网页版 Skills”，默认打开 `.agents/skills`，并可切换 `.claude/skills`、`.codex/skills`、`.gemini/skills`
+- 本地网页版 Skills 若已运行，再次打开会复用现有页面；可在 Skills 菜单里关闭，也可执行 `npx yq-workflow config skills-web-close`
+- 网页右上角提供“关闭服务”按钮，可直接在浏览器里关闭当前 Skills 服务
+- 帮助页：仅显示常用 `npx` 命令与操作提示
 
 ## 运行时约定
 
@@ -75,4 +81,20 @@ npx yq-workflow diagnose-mcp
 npx yq-workflow menu
 ```
 
-然后进入帮助页查看，命令和技能是分开展示的。
+然后进入“配置 Skills”查看目录、网页预览和安装项。
+
+**想直接用网页方式浏览 skills 文件树**
+
+运行：
+
+```bash
+npx yq-workflow config skills-web
+```
+
+**想关闭已经打开的 skills 网页**
+
+运行：
+
+```bash
+npx yq-workflow config skills-web-close
+```

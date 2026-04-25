@@ -1,11 +1,16 @@
 import type { InstallResult } from '../types'
 import ansis from 'ansis'
 import fs from 'fs-extra'
+import { exec, execFile } from 'node:child_process'
 import { homedir } from 'node:os'
 import { basename, dirname, join } from 'pathe'
+import { promisify } from 'node:util'
 import { getWorkflowById } from './installer-data'
 import { PACKAGE_ROOT, injectConfigVariables, replaceHomePathsInTemplate } from './installer-template'
 import { installSkillCommands } from './skill-registry'
+
+const execAsync = promisify(exec)
+const execFileAsync = promisify(execFile)
 
 export {
   getAllCommandIds,
@@ -57,12 +62,560 @@ interface InstallContext {
   result: InstallResult
 }
 
+export interface AgentSkillDirectory {
+  name: string
+  path: string
+  relativePath: string
+}
+
+export type BaseEnvironmentToolId = 'git' | 'powershell' | 'nodejs' | 'python' | 'pnpm' | 'uv' | 'vscode'
+
+export interface BaseEnvironmentInstallAction {
+  id: string
+  label: string
+  type: 'command' | 'link'
+  command?: string
+  args?: string[]
+  url?: string
+  successText?: string
+}
+
+export interface BaseEnvironmentToolStatus {
+  id: BaseEnvironmentToolId
+  label: string
+  description: string
+  installed: boolean
+  version: string | null
+  detail: string
+  installActions: BaseEnvironmentInstallAction[]
+}
+
+type DetectionAttempt = {
+  command: string
+  args: string[]
+  label: string
+  versionPattern?: RegExp
+  runner?: 'exec-file' | 'powershell'
+}
+
+type BaseEnvironmentToolDefinition = {
+  id: BaseEnvironmentToolId
+  label: string
+  description: string
+  detect: (platform?: NodeJS.Platform) => DetectionAttempt[]
+  getDetail: (version: string | null, sourceLabel: string | null, platform?: NodeJS.Platform, commandPath?: string | null) => string
+  installActions: Partial<Record<NodeJS.Platform, BaseEnvironmentInstallAction[]>>
+  locateCommand?: string | ((platform: NodeJS.Platform) => string | null)
+}
+
+function extractVersion(output: string, pattern?: RegExp): string | null {
+  const normalized = output.trim()
+  if (!normalized) {
+    return null
+  }
+
+  const match = (pattern || /(\d+(?:\.\d+)+)/).exec(normalized)
+  return match?.[1] || null
+}
+
+function toPowerShellLiteral(value: string): string {
+  return `'${value.replace(/'/g, '\'\'')}'`
+}
+
+export function buildPowerShellDetectionCommand(command: string, args: string[]): string {
+  const parts = [toPowerShellLiteral(command), ...args.map(toPowerShellLiteral)]
+  return `& ${parts.join(' ')}`
+}
+
+async function resolveCommandPath(command: string, platform: NodeJS.Platform): Promise<string | null> {
+  try {
+    const locator = platform === 'win32' ? 'where.exe' : 'which'
+    const { stdout } = await execFileAsync(locator, [command], {
+      timeout: 10000,
+      windowsHide: true,
+    })
+    const firstLine = stdout.split(/\r?\n/u).map(item => item.trim()).find(Boolean)
+    return firstLine || null
+  }
+  catch {
+    return null
+  }
+}
+
+async function detectCommandVersion(attempts: DetectionAttempt[]): Promise<{ version: string | null, sourceLabel: string | null }> {
+  for (const attempt of attempts) {
+    try {
+      const { stdout, stderr } = attempt.runner === 'powershell'
+        ? await execFileAsync('powershell', ['-NoProfile', '-Command', buildPowerShellDetectionCommand(attempt.command, attempt.args)], {
+            timeout: 20000,
+            windowsHide: true,
+          })
+        : await execFileAsync(attempt.command, attempt.args, {
+            timeout: 20000,
+            windowsHide: true,
+          })
+      const output = `${stdout || ''}\n${stderr || ''}`.trim()
+      const version = extractVersion(output, attempt.versionPattern)
+      if (version) {
+        return {
+          version,
+          sourceLabel: attempt.label,
+        }
+      }
+    }
+    catch {
+      continue
+    }
+  }
+
+  return {
+    version: null,
+    sourceLabel: null,
+  }
+}
+
+function getBaseEnvironmentToolDefinitions(): BaseEnvironmentToolDefinition[] {
+  return [
+    {
+      id: 'git',
+      label: 'Git',
+      description: '检测 Git 命令行并提供官方安装入口',
+      detect: () => [
+        { command: 'git', args: ['--version'], label: 'git', versionPattern: /git version (\d+(?:\.\d+)+)/i },
+      ],
+      getDetail: version => version ? `已检测到 Git ${version}` : '未检测到 Git 命令',
+      installActions: {
+        win32: [
+          {
+            id: 'install-winget',
+            label: '使用 winget 安装 / 更新',
+            type: 'command',
+            command: 'winget',
+            args: ['install', '--id', 'Git.Git', '-e', '--source', 'winget'],
+            successText: 'Git 安装命令已执行完成',
+          },
+          {
+            id: 'open-download',
+            label: '打开 Git 官网下载页',
+            type: 'link',
+            url: 'https://git-scm.com/download/win',
+          },
+        ],
+        darwin: [
+          {
+            id: 'install-brew',
+            label: '使用 Homebrew 安装 / 更新',
+            type: 'command',
+            command: 'brew',
+            args: ['install', 'git'],
+            successText: 'Git 安装命令已执行完成',
+          },
+          {
+            id: 'open-download',
+            label: '打开 Git 官网下载页',
+            type: 'link',
+            url: 'https://git-scm.com/download/mac',
+          },
+        ],
+      },
+      locateCommand: 'git',
+    },
+    {
+      id: 'powershell',
+      label: 'PowerShell',
+      description: '检测 PowerShell 版本，Windows 与 macOS 提供安装入口',
+      detect: platform => {
+        if (platform === 'win32') {
+          return [
+            { command: 'pwsh', args: ['--version'], label: 'PowerShell 7', versionPattern: /(\d+(?:\.\d+)+)/ },
+            { command: 'powershell', args: ['-NoProfile', '-Command', '$PSVersionTable.PSVersion.ToString()'], label: 'Windows PowerShell', versionPattern: /(\d+(?:\.\d+)+)/ },
+          ]
+        }
+
+        if (platform === 'darwin') {
+          return [
+            { command: 'pwsh', args: ['--version'], label: 'PowerShell', versionPattern: /(\d+(?:\.\d+)+)/ },
+          ]
+        }
+
+        return []
+      },
+      getDetail: (version, sourceLabel, platform) => {
+        if (!version) {
+          return platform === 'win32'
+            ? '未检测到可用的 PowerShell 命令'
+            : '未检测到 PowerShell 7 (pwsh)'
+        }
+
+        return sourceLabel ? `已检测到 ${sourceLabel} ${version}` : `已检测到 PowerShell ${version}`
+      },
+      installActions: {
+        win32: [
+          {
+            id: 'install-winget',
+            label: '使用 winget 安装 / 更新 PowerShell 7',
+            type: 'command',
+            command: 'winget',
+            args: ['install', '--id', 'Microsoft.PowerShell', '-e', '--source', 'winget'],
+            successText: 'PowerShell 安装命令已执行完成',
+          },
+          {
+            id: 'open-download',
+            label: '打开 PowerShell 官网',
+            type: 'link',
+            url: 'https://learn.microsoft.com/powershell/scripting/install/installing-powershell-on-windows',
+          },
+        ],
+        darwin: [
+          {
+            id: 'install-brew',
+            label: '使用 Homebrew 安装 PowerShell',
+            type: 'command',
+            command: 'brew',
+            args: ['install', '--cask', 'powershell'],
+            successText: 'PowerShell 安装命令已执行完成',
+          },
+          {
+            id: 'open-download',
+            label: '打开 PowerShell 官网',
+            type: 'link',
+            url: 'https://learn.microsoft.com/powershell/scripting/install/installing-powershell-on-macos',
+          },
+        ],
+      },
+      locateCommand: platform => platform === 'win32' ? 'powershell' : 'pwsh',
+    },
+    {
+      id: 'nodejs',
+      label: 'Node.js',
+      description: '检测 Node.js 运行时版本',
+      detect: () => [
+        { command: 'node', args: ['--version'], label: 'node', versionPattern: /v?(\d+(?:\.\d+)+)/i },
+      ],
+      getDetail: version => version ? `已检测到 Node.js ${version}` : '未检测到 Node.js',
+      installActions: {
+        win32: [
+          {
+            id: 'install-winget',
+            label: '使用 winget 安装 / 更新 Node.js LTS',
+            type: 'command',
+            command: 'winget',
+            args: ['install', '--id', 'OpenJS.NodeJS.LTS', '-e', '--source', 'winget'],
+            successText: 'Node.js 安装命令已执行完成',
+          },
+          {
+            id: 'open-download',
+            label: '打开 Node.js 官网下载页',
+            type: 'link',
+            url: 'https://nodejs.org/zh-cn/download',
+          },
+        ],
+        darwin: [
+          {
+            id: 'install-brew',
+            label: '使用 Homebrew 安装 / 更新 Node.js',
+            type: 'command',
+            command: 'brew',
+            args: ['install', 'node'],
+            successText: 'Node.js 安装命令已执行完成',
+          },
+          {
+            id: 'open-download',
+            label: '打开 Node.js 官网下载页',
+            type: 'link',
+            url: 'https://nodejs.org/zh-cn/download',
+          },
+        ],
+      },
+      locateCommand: 'node',
+    },
+    {
+      id: 'python',
+      label: 'Python',
+      description: '检测 Python 解释器版本',
+      detect: () => [
+        { command: 'python3', args: ['--version'], label: 'python3', versionPattern: /Python (\d+(?:\.\d+)+)/i },
+        { command: 'python', args: ['--version'], label: 'python', versionPattern: /Python (\d+(?:\.\d+)+)/i },
+      ],
+      getDetail: (version, sourceLabel) => {
+        if (!version) {
+          return '未检测到 Python'
+        }
+
+        return sourceLabel ? `已检测到 ${sourceLabel} ${version}` : `已检测到 Python ${version}`
+      },
+      installActions: {
+        win32: [
+          {
+            id: 'install-winget',
+            label: '使用 winget 安装 / 更新 Python 3',
+            type: 'command',
+            command: 'winget',
+            args: ['install', '--id', 'Python.Python.3.12', '-e', '--source', 'winget'],
+            successText: 'Python 安装命令已执行完成',
+          },
+          {
+            id: 'open-download',
+            label: '打开 Python 官网下载页',
+            type: 'link',
+            url: 'https://www.python.org/downloads/',
+          },
+        ],
+        darwin: [
+          {
+            id: 'install-brew',
+            label: '使用 Homebrew 安装 / 更新 Python 3',
+            type: 'command',
+            command: 'brew',
+            args: ['install', 'python'],
+            successText: 'Python 安装命令已执行完成',
+          },
+          {
+            id: 'open-download',
+            label: '打开 Python 官网下载页',
+            type: 'link',
+            url: 'https://www.python.org/downloads/macos/',
+          },
+        ],
+      },
+      locateCommand: platform => platform === 'win32' ? 'python' : 'python3',
+    },
+    {
+      id: 'pnpm',
+      label: 'pnpm',
+      description: '检测 pnpm 包管理器版本',
+      detect: platform => platform === 'win32'
+        ? [
+            { command: 'pnpm', args: ['--version'], label: 'pnpm', versionPattern: /(\d+(?:\.\d+)+)/i, runner: 'powershell' },
+          ]
+        : [
+            { command: 'pnpm', args: ['--version'], label: 'pnpm', versionPattern: /(\d+(?:\.\d+)+)/i },
+          ],
+      getDetail: version => version ? `已检测到 pnpm ${version}` : '未检测到 pnpm',
+      installActions: {
+        win32: [
+          {
+            id: 'install-corepack',
+            label: '使用 Corepack 启用 pnpm',
+            type: 'command',
+            command: 'corepack',
+            args: ['enable', 'pnpm'],
+            successText: 'pnpm 启用命令已执行完成',
+          },
+          {
+            id: 'open-docs',
+            label: '打开 pnpm 安装文档',
+            type: 'link',
+            url: 'https://pnpm.io/installation',
+          },
+        ],
+        darwin: [
+          {
+            id: 'install-corepack',
+            label: '使用 Corepack 启用 pnpm',
+            type: 'command',
+            command: 'corepack',
+            args: ['enable', 'pnpm'],
+            successText: 'pnpm 启用命令已执行完成',
+          },
+          {
+            id: 'open-docs',
+            label: '打开 pnpm 安装文档',
+            type: 'link',
+            url: 'https://pnpm.io/installation',
+          },
+        ],
+      },
+      locateCommand: 'pnpm',
+    },
+    {
+      id: 'uv',
+      label: 'uv',
+      description: '检测 Astral uv 版本，并提供官方安装入口',
+      detect: platform => platform === 'win32'
+        ? [
+            { command: 'uv', args: ['--version'], label: 'uv', versionPattern: /uv (\d+(?:\.\d+)+)/i, runner: 'powershell' },
+          ]
+        : [
+            { command: 'uv', args: ['--version'], label: 'uv', versionPattern: /uv (\d+(?:\.\d+)+)/i },
+          ],
+      getDetail: version => version ? `已检测到 uv ${version}` : '未检测到 uv',
+      installActions: {
+        win32: [
+          {
+            id: 'install-official',
+            label: '运行 uv 官方安装脚本',
+            type: 'command',
+            command: 'powershell',
+            args: ['-ExecutionPolicy', 'ByPass', '-c', 'irm https://astral.sh/uv/install.ps1 | iex'],
+            successText: 'uv 安装脚本已执行完成',
+          },
+          {
+            id: 'open-docs',
+            label: '打开 uv 安装文档',
+            type: 'link',
+            url: 'https://docs.astral.sh/uv/getting-started/installation/',
+          },
+        ],
+        darwin: [
+          {
+            id: 'install-official',
+            label: '运行 uv 官方安装脚本',
+            type: 'command',
+            command: 'sh',
+            args: ['-c', 'curl -LsSf https://astral.sh/uv/install.sh | sh'],
+            successText: 'uv 安装脚本已执行完成',
+          },
+          {
+            id: 'open-docs',
+            label: '打开 uv 安装文档',
+            type: 'link',
+            url: 'https://docs.astral.sh/uv/getting-started/installation/',
+          },
+        ],
+      },
+      locateCommand: 'uv',
+    },
+    {
+      id: 'vscode',
+      label: 'VS Code',
+      description: '检测 Visual Studio Code CLI 版本与命令路径',
+      detect: platform => platform === 'win32'
+        ? [
+            { command: 'code', args: ['--version'], label: 'code --version', versionPattern: /(\d+(?:\.\d+)+)/i, runner: 'powershell' },
+            { command: 'code', args: ['-v'], label: 'code -v', versionPattern: /(\d+(?:\.\d+)+)/i, runner: 'powershell' },
+          ]
+        : [
+            { command: 'code', args: ['--version'], label: 'code --version', versionPattern: /(\d+(?:\.\d+)+)/i },
+            { command: 'code', args: ['-v'], label: 'code -v', versionPattern: /(\d+(?:\.\d+)+)/i },
+          ],
+      getDetail: (version, _sourceLabel, _platform, commandPath) => {
+        if (!version) {
+          return '未检测到 code 命令'
+        }
+
+        return commandPath
+          ? `已检测到 VS Code ${version} (${commandPath})`
+          : `已检测到 VS Code ${version}`
+      },
+      installActions: {
+        win32: [
+          {
+            id: 'install-winget',
+            label: '使用 winget 安装 / 更新 VS Code',
+            type: 'command',
+            command: 'winget',
+            args: ['install', '--id', 'Microsoft.VisualStudioCode', '-e', '--source', 'winget'],
+            successText: 'VS Code 安装命令已执行完成',
+          },
+          {
+            id: 'open-download',
+            label: '打开 VS Code 官网',
+            type: 'link',
+            url: 'https://code.visualstudio.com/',
+          },
+        ],
+        darwin: [
+          {
+            id: 'install-brew',
+            label: '使用 Homebrew 安装 VS Code',
+            type: 'command',
+            command: 'brew',
+            args: ['install', '--cask', 'visual-studio-code'],
+            successText: 'VS Code 安装命令已执行完成',
+          },
+          {
+            id: 'open-download',
+            label: '打开 VS Code 官网',
+            type: 'link',
+            url: 'https://code.visualstudio.com/',
+          },
+        ],
+      },
+      locateCommand: 'code',
+    },
+  ]
+}
+
+export function getBaseEnvironmentTools(platform: NodeJS.Platform = process.platform): BaseEnvironmentToolStatus[] {
+  return getBaseEnvironmentToolDefinitions().map((item) => {
+    const installActions = item.installActions[platform] || []
+    return {
+      id: item.id,
+      label: item.label,
+      description: item.description,
+      installed: false,
+      version: null,
+      detail: item.getDetail(null, null, platform),
+      installActions,
+    }
+  })
+}
+
+export async function detectBaseEnvironmentToolStatuses(
+  platform: NodeJS.Platform = process.platform,
+): Promise<BaseEnvironmentToolStatus[]> {
+  const definitions = getBaseEnvironmentToolDefinitions()
+
+  return Promise.all(definitions.map(async (item) => {
+    const installActions = item.installActions[platform] || []
+    const attempts = item.detect(platform)
+    const locateCommand = typeof item.locateCommand === 'function'
+      ? item.locateCommand(platform)
+      : item.locateCommand
+    const commandPath = locateCommand ? await resolveCommandPath(locateCommand, platform) : null
+    const { version, sourceLabel } = attempts.length > 0
+      ? await detectCommandVersion(attempts)
+      : { version: null, sourceLabel: null }
+
+    return {
+      id: item.id,
+      label: item.label,
+      description: item.description,
+      installed: version !== null,
+      version,
+      detail: item.getDetail(version, sourceLabel, platform, commandPath),
+      installActions,
+    }
+  }))
+}
+
 export function getAgentSkillsDir(): string {
   return process.env.YQ_AGENT_SKILLS_DIR || join(homedir(), '.agents', 'skills')
 }
 
 export function getCodexDir(): string {
   return process.env.YQ_CODEX_DIR || join(homedir(), '.codex')
+}
+
+export async function listAgentSkillDirectories(rootDir = getAgentSkillsDir()): Promise<AgentSkillDirectory[]> {
+  if (!(await fs.pathExists(rootDir))) {
+    return []
+  }
+
+  const results: AgentSkillDirectory[] = []
+
+  async function scan(dir: string, relativeDir = ''): Promise<void> {
+    const entries = await fs.readdir(dir, { withFileTypes: true })
+
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue
+
+      const entryPath = join(dir, entry.name)
+      const entryRelativePath = relativeDir ? join(relativeDir, entry.name) : entry.name
+
+      results.push({
+        name: entry.name,
+        path: entryPath,
+        relativePath: entryRelativePath,
+      })
+
+      await scan(entryPath, entryRelativePath)
+    }
+  }
+
+  await scan(rootDir)
+  return results.sort((a, b) => a.relativePath.localeCompare(b.relativePath))
 }
 
 async function prepareDirectoryDestination(destDir: string): Promise<void> {
@@ -512,7 +1065,19 @@ export interface UninstallResult {
   removedSkills: string[]
   removedRules: boolean
   removedBin: boolean
+  removedGlobalPackage: boolean
   errors: string[]
+}
+
+async function uninstallGlobalYqWorkflowPackage(): Promise<void> {
+  if (process.env.YQ_SKIP_GLOBAL_PACKAGE_UNINSTALL === 'true') {
+    return
+  }
+
+  await execAsync('npm uninstall -g yq-workflow', {
+    timeout: 120000,
+    env: process.env,
+  })
 }
 
 export async function uninstallWorkflows(installDir: string): Promise<UninstallResult> {
@@ -524,6 +1089,7 @@ export async function uninstallWorkflows(installDir: string): Promise<UninstallR
     removedSkills: [],
     removedRules: false,
     removedBin: false,
+    removedGlobalPackage: false,
     errors: [],
   }
 
@@ -608,6 +1174,14 @@ export async function uninstallWorkflows(installDir: string): Promise<UninstallR
     catch (error) {
       result.errors.push(`Failed to remove .yq directory: ${error}`)
     }
+  }
+
+  try {
+    await uninstallGlobalYqWorkflowPackage()
+    result.removedGlobalPackage = true
+  }
+  catch (error) {
+    result.errors.push(`Failed to uninstall global package yq-workflow: ${error}`)
   }
 
   return result

@@ -34,7 +34,7 @@ const zhCN = {
       commands: '命令',
       commandDescriptions: {
         showMenu: '显示交互式菜单（默认）',
-        initConfig: '初始化 YQ 工作流工具',
+        initConfig: '初始化 YQ AI 编程工具助手',
         configMcp: '配置 MCP Token',
         diagnoseMcp: '诊断 MCP 配置问题',
         fixMcp: '修复 Windows MCP 配置',
@@ -68,7 +68,7 @@ const zhCN = {
   },
   init: {
     welcome: '欢迎使用 YQ 工作流工具',
-    subtitle: 'Claude Code 工作流安装器',
+    subtitle: 'AI 编程工具助手安装器',
     selectLanguage: '选择语言 / Select language',
     selectWorkflows: '选择要安装的工作流（可多选）',
     confirmInstall: '确认安装以上配置？',
@@ -301,10 +301,9 @@ const zhCN = {
       init: '初始化 YQ 配置',
       update: '更新工作流',
       configMcp: '配置 MCP',
-      configApi: '配置 API',
-      configStyle: '配置输出风格',
+      configApi: '配置模型 API',
       tools: '实用工具',
-      installClaude: '安装 Claude Code',
+      installClaude: '安装编程工具',
       checkUpdates: '检查更新',
       uninstall: '卸载 YQ',
       help: '帮助',
@@ -343,32 +342,6 @@ const zhCN = {
         worktree: 'Git Worktree 管理',
         init: '初始化项目 CLAUDE.md',
       },
-    },
-    style: {
-      title: '配置输出风格',
-      currentStyle: '当前风格',
-      selectStyle: '选择输出风格',
-      notChanged: '风格未变更',
-      installed: '已安装风格文件: {{style}}',
-      set: '输出风格已设置为: {{style}}',
-      default: '默认',
-      defaultDesc: 'Claude Code 原生风格',
-      engineerPro: '专业工程师',
-      engineerProDesc: '简洁专业的技术风格',
-      nekomata: '猫娘工程师',
-      nekomataDesc: '可爱猫娘语气',
-      laowang: '老王工程师',
-      laowangDesc: '接地气的老王风格',
-      ojousama: '大小姐工程师',
-      ojousamaDesc: '优雅大小姐语气',
-      abyss: '邪修风格',
-      abyssDesc: '宿命深渊 · 道语标签',
-      abyssConcise: '冷刃简报',
-      abyssConciseDesc: '保留邪修人格，更克制更短',
-      abyssCommand: '铁律军令',
-      abyssCommandDesc: '命令式压缩输出',
-      abyssRitual: '祭仪长卷',
-      abyssRitualDesc: '仪式感叙事张力',
     },
     claude: {
       title: '安装/重装 Claude Code',
@@ -472,7 +445,7 @@ const en: typeof zhCN = {
       commands: 'Commands',
       commandDescriptions: {
         showMenu: 'Show interactive menu (default)',
-        initConfig: 'Initialize YQ workflow toolkit',
+        initConfig: 'Initialize YQ AI coding toolkit',
         configMcp: 'Configure MCP Token',
         diagnoseMcp: 'Diagnose MCP configuration issues',
         fixMcp: 'Fix Windows MCP configuration',
@@ -505,8 +478,8 @@ const en: typeof zhCN = {
     },
   },
   init: {
-    welcome: 'Welcome to YQ Workflow Toolkit',
-    subtitle: 'Claude Code workflow installer',
+    welcome: 'Welcome to YQ AI Coding Toolkit',
+    subtitle: 'AI coding toolkit installer',
     selectLanguage: 'Select language / 选择语言',
     selectWorkflows: 'Select workflows to install (multi-select)',
     confirmInstall: 'Confirm installation with above configuration?',
@@ -739,10 +712,9 @@ const en: typeof zhCN = {
       init: 'Initialize YQ configuration',
       update: 'Update workflows',
       configMcp: 'Configure MCP',
-      configApi: 'Configure API',
-      configStyle: 'Configure output style',
+      configApi: 'Configure model API',
       tools: 'Tools',
-      installClaude: 'Install Claude Code',
+      installClaude: 'Install coding tools',
       checkUpdates: 'Check updates',
       uninstall: 'Uninstall YQ',
       help: 'Help',
@@ -781,32 +753,6 @@ const en: typeof zhCN = {
         worktree: 'Git Worktree management',
         init: 'Initialize project CLAUDE.md',
       },
-    },
-    style: {
-      title: 'Configure Output Style',
-      currentStyle: 'Current style',
-      selectStyle: 'Select output style',
-      notChanged: 'Style not changed',
-      installed: 'Style file installed: {{style}}',
-      set: 'Output style set to: {{style}}',
-      default: 'Default',
-      defaultDesc: 'Claude Code native style',
-      engineerPro: 'Professional Engineer',
-      engineerProDesc: 'Clean, professional technical style',
-      nekomata: 'Nekomata Engineer',
-      nekomataDesc: 'Cute cat-girl tone',
-      laowang: 'Laowang Engineer',
-      laowangDesc: 'Down-to-earth Chinese uncle style',
-      ojousama: 'Ojou-sama Engineer',
-      ojousamaDesc: 'Elegant lady tone',
-      abyss: 'Abyss Cultivator',
-      abyssDesc: 'Dark cultivator style',
-      abyssConcise: 'Abyss Concise',
-      abyssConciseDesc: 'Dark cultivator, compressed output',
-      abyssCommand: 'Abyss Command',
-      abyssCommandDesc: 'Military command style',
-      abyssRitual: 'Abyss Ritual',
-      abyssRitualDesc: 'Ceremonial narrative style',
     },
     claude: {
       title: 'Install/Reinstall Claude Code',
@@ -881,9 +827,11 @@ const en: typeof zhCN = {
 
 export async function initI18n(lang: SupportedLang = 'zh-CN'): Promise<void> {
   if (!i18n.isInitialized) {
-    await i18n.init({
+    const initOptions = {
       lng: lang,
       fallbackLng: 'en',
+      // 新版 i18next 会在启动时打印 Locize 支持提示，这里显式关闭。
+      showSupportNotice: false,
       resources: {
         'zh-CN': { translation: zhCN, ...zhCN },
         en: { translation: en, ...en },
@@ -891,7 +839,9 @@ export async function initI18n(lang: SupportedLang = 'zh-CN'): Promise<void> {
       interpolation: {
         escapeValue: false,
       },
-    })
+    } as Parameters<typeof i18n.init>[0] & { showSupportNotice?: boolean }
+
+    await i18n.init(initOptions)
   }
   else if (i18n.language !== lang) {
     await i18n.changeLanguage(lang)
