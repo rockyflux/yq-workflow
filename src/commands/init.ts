@@ -11,7 +11,7 @@ export async function init(options: InitOptions = {}): Promise<void> {
   console.log()
   console.log(ansis.cyan.bold('  YQ AI 编程工具助手'))
   console.log(ansis.gray('  安装工作流命令、提示词、技能与常用工具入口'))
-  console.log(ansis.gray('  初始化仅安装工作流文件；API 请在主菜单单独配置'))
+  console.log(ansis.gray('  初始化仅安装工作流文件；API 可在 AI 账号管理或命令行中单独配置'))
   console.log()
 
   const language: SupportedLang = 'zh-CN'
