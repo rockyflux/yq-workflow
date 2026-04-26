@@ -5,6 +5,7 @@ import { homedir } from 'node:os'
 import { join } from 'pathe'
 import { configMcp } from './config-mcp'
 import { init } from './init'
+import { closePromptWebServer, getActivePromptWebState, launchPromptWebDetached } from './prompt-web'
 import { update } from './update'
 import { runBaseEnvironmentMenu } from './menu-base-environment'
 import {
@@ -19,6 +20,7 @@ import {
   runAiAccountManagementMenu,
   runClaudeCodeToolsMenu,
   runCodingToolsMenu,
+  runModelUsageMenu,
   runPopularWorkflowsMenu,
 } from './menu-managed-packages'
 import { configSkills, showHelp } from './menu-skills'
@@ -32,7 +34,7 @@ function getConfigFilePath(): string {
 }
 
 function shouldPauseAfterMainMenuAction(action: MenuAction): boolean {
-  return !['mcp', 'skills', 'tools', 'coding-tools', 'ai-accounts', 'environment', 'popular-workflows'].includes(action)
+  return !['mcp', 'prompts', 'skills', 'tools', 'coding-tools', 'ai-accounts', 'environment', 'popular-workflows', 'model-usage'].includes(action)
 }
 
 async function configApi(): Promise<void> {
@@ -64,8 +66,49 @@ async function configApi(): Promise<void> {
   console.log()
 }
 
+async function configPrompt(): Promise<void> {
+  const activePromptWeb = await getActivePromptWebState()
+  console.log()
+  console.log(ansis.cyan.bold('  提示词配置'))
+  console.log(ansis.gray(`  Claude：${join(homedir(), '.claude', 'CLAUDE.md')}`))
+  console.log(ansis.gray(`  Codex：${join(homedir(), '.codex', 'AGENTS.md')}`))
+  console.log(ansis.gray(`  Gemini：${join(homedir(), '.gemini', 'GEMINI.md')}`))
+  if (activePromptWeb) {
+    console.log(ansis.green(`  本地提示词配置页运行中：${activePromptWeb.url}`))
+  }
+  console.log()
+
+  const result = await launchPromptWebDetached('claude')
+  if (result.status === 'reused') {
+    console.log(ansis.green(`  已复用已打开的提示词配置页：${result.url}`))
+  }
+  else {
+    console.log(ansis.green('  已尝试打开本地提示词配置页，默认展示 Claude 提示词'))
+  }
+  console.log(ansis.gray('  如未自动打开，可执行 yq config prompt-web'))
+  console.log(ansis.gray('  按 Enter 将关闭本地提示词配置页，并自动返回'))
+  console.log()
+
+  await inquirer.prompt([{
+    type: 'input',
+    name: 'continue',
+    message: ansis.gray('按 Enter 关闭本地提示词配置页并返回...'),
+  }])
+
+  const closed = await closePromptWebServer()
+  console.log()
+  if (closed) {
+    console.log(ansis.green('  已关闭本地提示词配置页'))
+  }
+  else {
+    console.log(ansis.gray('  当前没有运行中的本地提示词配置页'))
+  }
+  console.log()
+}
+
 export {
   configApi,
+  configPrompt,
   configSkills,
   showHelp,
 }
@@ -121,13 +164,15 @@ export async function showMainMenu(): Promise<void> {
         { name: formatMenuChoice('1. 初始化 / 重装工作流', '- 安装 YQ 工作流'), value: 'init' },
         { name: formatMenuChoice('2. 更新工作流', '- 更新到最新版本'), value: 'update' },
         { name: formatMenuChoice('3. 热门开源工作流', '- GET SHIT DONE / gstack / Trellis'), value: 'popular-workflows' },
-        { name: formatMenuChoice('4. 配置 Skills', '- Skills.sh + 本地 Skills 目录'), value: 'skills' },
-        { name: formatMenuChoice('5. 配置 MCP', '- 必装 / 数据库 / Git / 文件资源'), value: 'mcp' },
+        { name: formatMenuChoice('4. 提示词配置', '- Claude / Codex / Gemini 提示词编辑器'), value: 'prompts' },
+        { name: formatMenuChoice('5. 配置 Skills', '- Skills.sh + 本地 Skills 目录'), value: 'skills' },
+        { name: formatMenuChoice('6. 配置 MCP', '- Claude / Codex / Gemini 本地网页管理'), value: 'mcp' },
         new inquirer.Separator(`${MENU_SEPARATOR} 编程工具 ${MENU_SEPARATOR}`),
         { name: formatMenuChoice('T. Claude Code 工具', '- Claude Code, ccusage, CCR, CCometixLine'), value: 'tools' },
         { name: formatMenuChoice('E. 基础环境检测', '- Git, PowerShell, Node.js, Python, pnpm, uv, VS Code'), value: 'environment' },
-        { name: formatMenuChoice('C. 安装编程工具', '- Claude Code, Codex, Gemini, OpenCode, MossX'), value: 'coding-tools' },
-        { name: formatMenuChoice('I. AI 账号管理', '- cc-switch, Cockpit Tools, CLIProxyAPI, Cherry Studio'), value: 'ai-accounts' },
+        { name: formatMenuChoice('C. 安装编程工具', '- CLI 命令行版 / 桌面端 UI'), value: 'coding-tools' },
+        { name: formatMenuChoice('I. 模型账号管理', '- 客户端 / 续杯工具'), value: 'ai-accounts' },
+        { name: formatMenuChoice('U. 模型使用统计', '- Claude Code / Codex / 网页版统计工具'), value: 'model-usage' },
         new inquirer.Separator(`${MENU_SEPARATOR} YQ ${MENU_SEPARATOR}`),
         { name: formatMenuChoice('H. 帮助', '- 查看已安装命令、Skills 与工具'), value: 'help' },
         { name: formatMenuChoice('-. 卸载和删除配置', '- 移除工作流文件并删除 yq-workflow'), value: 'uninstall' },
@@ -146,6 +191,9 @@ export async function showMainMenu(): Promise<void> {
       case 'popular-workflows':
         await runPopularWorkflowsMenu()
         break
+      case 'prompts':
+        await configPrompt()
+        break
       case 'mcp':
         await configMcp()
         break
@@ -163,6 +211,9 @@ export async function showMainMenu(): Promise<void> {
         break
       case 'ai-accounts':
         await runAiAccountManagementMenu()
+        break
+      case 'model-usage':
+        await runModelUsageMenu()
         break
       case 'help':
         await showHelp()

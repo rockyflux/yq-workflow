@@ -2,7 +2,7 @@ import type { AceToolConfig, FastContextConfig } from '../types'
 import { homedir } from 'node:os'
 import fs from 'fs-extra'
 import { join } from 'pathe'
-import { type McpServerConfig, backupClaudeCodeConfig, buildMcpServerConfig, fixWindowsMcpConfig, mergeMcpServers, readClaudeCodeConfig, writeClaudeCodeConfig } from './mcp'
+import { type McpServerConfig, backupMcpClientConfig, buildMcpServerConfig, getMcpServersFromConfig, readMcpClientConfig, removeMcpServerFromClient, setMcpServersInConfig, writeMcpClientConfig } from './mcp'
 import { isWindows } from './platform'
 
 // ═══════════════════════════════════════════════════════
@@ -23,32 +23,23 @@ async function configureMcpInClaude(
   label: string,
 ): Promise<McpInstallResult> {
   try {
-    let existingConfig = await readClaudeCodeConfig()
-    if (!existingConfig) {
-      existingConfig = { mcpServers: {} }
-    }
+    const existingConfig = await readMcpClientConfig('claude')
+    const existingServers = getMcpServersFromConfig('claude', existingConfig)
 
     // Backup before modifying (if config exists)
-    if (existingConfig.mcpServers && Object.keys(existingConfig.mcpServers).length > 0) {
-      const backupPath = await backupClaudeCodeConfig()
+    if (Object.keys(existingServers).length > 0) {
+      const backupPath = await backupMcpClientConfig('claude')
       if (backupPath) {
         console.log(`  ✓ Backup created: ${backupPath}`)
       }
     }
 
-    // Merge new server into existing config
-    let mergedConfig = mergeMcpServers(existingConfig, {
-      [serverId]: serverConfig,
-    })
+    existingServers[serverId] = serverConfig
+    await writeMcpClientConfig('claude', setMcpServersInConfig('claude', existingConfig, existingServers))
 
-    // Apply Windows fixes if needed
     if (isWindows()) {
-      mergedConfig = fixWindowsMcpConfig(mergedConfig)
       console.log('  ✓ Applied Windows MCP configuration fixes')
     }
-
-    // Write config back (preserve all other fields)
-    await writeClaudeCodeConfig(mergedConfig)
 
     return {
       success: true,
@@ -75,19 +66,19 @@ async function configureMcpInClaude(
  */
 export async function uninstallAceTool(): Promise<{ success: boolean, message: string }> {
   try {
-    const existingConfig = await readClaudeCodeConfig()
+    const existingConfig = await readMcpClientConfig('claude')
+    const existingServers = getMcpServersFromConfig('claude', existingConfig)
 
     if (!existingConfig) {
       return { success: true, message: 'No ~/.claude.json found, nothing to remove' }
     }
 
-    if (!existingConfig.mcpServers || !existingConfig.mcpServers['ace-tool']) {
+    if (!existingServers['ace-tool']) {
       return { success: true, message: 'ace-tool MCP not found in config' }
     }
 
-    await backupClaudeCodeConfig()
-    delete existingConfig.mcpServers['ace-tool']
-    await writeClaudeCodeConfig(existingConfig)
+    await backupMcpClientConfig('claude')
+    await removeMcpServerFromClient('claude', 'ace-tool')
 
     return { success: true, message: 'ace-tool MCP removed from ~/.claude.json' }
   }
@@ -266,10 +257,9 @@ export async function installMcpServer(
  */
 export async function uninstallMcpServer(id: string): Promise<{ success: boolean, message: string }> {
   try {
-    const existingConfig = await readClaudeCodeConfig()
-    if (existingConfig?.mcpServers?.[id]) {
-      delete existingConfig.mcpServers[id]
-      await writeClaudeCodeConfig(existingConfig)
+    const existingServers = await readMcpClientConfig('claude').then(config => getMcpServersFromConfig('claude', config))
+    if (existingServers[id]) {
+      await removeMcpServerFromClient('claude', id)
     }
     return { success: true, message: `${id} MCP uninstalled successfully` }
   }

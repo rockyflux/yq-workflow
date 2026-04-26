@@ -5,7 +5,9 @@ import { compareVersions, getGlobalPackageVersion, getLatestVersion } from '../u
 import {
   AI_ACCOUNT_MANAGEMENT_PACKAGES,
   CLAUDE_CODE_TOOL_PACKAGES,
-  CODING_TOOL_PACKAGES,
+  CODING_TOOL_CLI_PACKAGES,
+  CODING_TOOL_DESKTOP_PACKAGES,
+  MODEL_USAGE_PACKAGES,
   POPULAR_WORKFLOW_PACKAGES,
 } from './menu-constants'
 import type { ManagedPackage, ManagedPackageStatus } from './menu-constants'
@@ -69,6 +71,14 @@ function printManagedPackageStatusLines(
   console.log()
 
   for (const item of packages) {
+    if (item.runOnly) {
+      console.log(`  ${ansis.cyan(item.label.padEnd(14))} ${ansis.green('运行（npx）')}`)
+      if (item.description) {
+        console.log(ansis.gray(`  ${' '.repeat(16)}${item.description}`))
+      }
+      continue
+    }
+
     if (item.openDirectly) {
       const statusText = item.latestVersion
         ? ansis.green(item.latestVersion)
@@ -113,6 +123,14 @@ function printManagedPackageStatusLines(
 }
 
 function formatManagedPackageChoice(item: ManagedPackageStatus): string {
+  if (item.runOnly) {
+    return `${item.label}  ${ansis.gray(`- ${item.description || '运行统计命令'}`)}`
+  }
+
+  if (item.category === 'desktop') {
+    return `${item.label}  ${ansis.gray(`- ${item.description || item.externalActionText || '打开网页'}`)}`
+  }
+
   if (item.installType === 'external-link') {
     if (item.openDirectly) {
       return `${item.label}  ${ansis.gray(`- ${item.description || item.externalActionText || '打开网页'}`)}`
@@ -129,6 +147,10 @@ function formatManagedPackageChoice(item: ManagedPackageStatus): string {
 }
 
 function getPackageActionLabel(item: ManagedPackageStatus): string {
+  if (item.runOnly) {
+    return '运行（npx）'
+  }
+
   if (item.installType === 'external-link') {
     return item.externalActionText || '打开下载页'
   }
@@ -302,7 +324,7 @@ async function openManagedPackageTutorial(item: ManagedPackageStatus): Promise<v
 async function manageSinglePackage(item: ManagedPackageStatus): Promise<void> {
   const installLabel = getPackageActionLabel(item)
   const choices = [
-    { name: installLabel, value: 'install' },
+    ...(item.runOnly ? [] : [{ name: installLabel, value: 'install' }]),
     ...(item.installedVersion && item.installType !== 'external-link' ? [{ name: '卸载', value: 'uninstall' }] : []),
     ...(item.runCommand ? [{ name: item.installedVersion ? '运行' : '运行（npx）', value: 'run' }] : []),
     ...(item.tutorialUrl && item.tutorialUrl !== item.externalUrl ? [{ name: '打开教程', value: 'tutorial' }] : []),
@@ -343,6 +365,7 @@ async function runManagedPackageMenu(
     silentDetection?: boolean
     showSummary?: boolean
     showRefresh?: boolean
+    groupChoices?: (statuses: ManagedPackageStatus[]) => any[]
   },
 ): Promise<void> {
   while (true) {
@@ -361,14 +384,20 @@ async function runManagedPackageMenu(
       type: 'list',
       name: 'target',
       message: options.selectMessage,
-      choices: [
-        ...statuses.map(item => ({
-          name: formatManagedPackageChoice(item),
-          value: item.id,
-        })),
-        ...(options.showRefresh === false ? [] : [{ name: '重新检测版本', value: 'refresh' }]),
-        { name: '返回', value: 'back' },
-      ],
+      choices: options.groupChoices
+        ? [
+            ...options.groupChoices(statuses),
+            ...(options.showRefresh === false ? [] : [{ name: '重新检测版本', value: 'refresh' }]),
+            { name: '返回', value: 'back' },
+          ]
+        : [
+            ...statuses.map(item => ({
+              name: formatManagedPackageChoice(item),
+              value: item.id,
+            })),
+            ...(options.showRefresh === false ? [] : [{ name: '重新检测版本', value: 'refresh' }]),
+            { name: '返回', value: 'back' },
+          ],
       pageSize: 10,
       theme: {
         indexMode: 'number',
@@ -413,23 +442,102 @@ async function runManagedPackageMenu(
 }
 
 export async function runCodingToolsMenu(): Promise<void> {
-  await runManagedPackageMenu(CODING_TOOL_PACKAGES, {
-    title: '安装编程工具',
-    subtitle: '统一管理 Claude Code、Codex、Gemini CLI、OpenCode 与 MossX 客户端',
-    selectMessage: '选择要管理的编程工具',
-    continueMessage: '按 Enter 返回编程工具菜单...',
-  })
+  while (true) {
+    const cliStatuses = await detectManagedPackageStatuses(CODING_TOOL_CLI_PACKAGES, 'CLI 工具')
+    const desktopStatuses: ManagedPackageStatus[] = CODING_TOOL_DESKTOP_PACKAGES.map(item => ({
+      ...item,
+      installedVersion: null,
+      latestVersion: null,
+    }))
+
+    console.log()
+    console.log(ansis.cyan.bold('  安装编程工具'))
+    console.log(ansis.gray('  同页展示 CLI 命令行版与桌面端 UI；仅 CLI 工具执行版本检测'))
+    console.log()
+
+    const { target } = await promptMenuList([{
+      type: 'list',
+      name: 'target',
+      message: '选择要管理的编程工具',
+      choices: [
+        new inquirer.Separator('---------- CLI 命令行版 ----------'),
+        ...cliStatuses.map(item => ({
+          name: formatManagedPackageChoice(item),
+          value: item.id,
+        })),
+        { name: '重新检测 CLI 版本', value: 'refresh' },
+        new inquirer.Separator('---------- 桌面端 UI ----------'),
+        ...desktopStatuses.map(item => ({
+          name: formatManagedPackageChoice(item),
+          value: item.id,
+        })),
+        { name: '返回', value: 'back' },
+      ],
+      pageSize: 14,
+      theme: {
+        indexMode: 'number',
+      },
+    }])
+
+    if (target === 'back') return
+    if (target === 'refresh') {
+      continue
+    }
+
+    const statuses = [...cliStatuses, ...desktopStatuses]
+    const selected = statuses.find(item => item.id === target)
+    if (!selected) continue
+
+    if (selected.openDirectly) {
+      console.log()
+      if (selected.externalUrl && await openExternalUrl(selected.externalUrl)) {
+        console.log(ansis.green(`  已尝试打开 ${selected.label}`))
+      }
+      else if (selected.externalUrl) {
+        console.log(ansis.yellow(`  未能自动打开浏览器，请手动访问 ${selected.externalUrl}`))
+      }
+      else {
+        console.log(ansis.red(`  ${selected.label} 未配置项目地址`))
+      }
+    }
+    else {
+      await manageSinglePackage(selected)
+    }
+
+    console.log()
+    await inquirer.prompt([{
+      type: 'input',
+      name: 'continue',
+      message: ansis.gray('按 Enter 返回编程工具菜单...'),
+    }])
+  }
 }
 
 export async function runAiAccountManagementMenu(): Promise<void> {
   await runManagedPackageMenu(AI_ACCOUNT_MANAGEMENT_PACKAGES, {
-    title: 'AI 账号管理',
-    subtitle: '集中收录模型 API 配置、AI 账号管理、统一接入与桌面客户端入口，选中后立即打开网页',
+    title: '模型账号管理、续杯',
+    subtitle: '按客户端与账号 / token 供应商分组展示常用入口，选中后立即打开网页',
     selectMessage: '选择要打开的网页',
-    continueMessage: '按 Enter 返回 AI 账号管理菜单...',
+    continueMessage: '按 Enter 返回 模型账号管理菜单...',
     silentDetection: true,
     showSummary: false,
     showRefresh: false,
+    groupChoices: statuses => [
+      new inquirer.Separator('---------- 客户端 ----------'),
+      ...statuses
+        .filter(item => item.accountCategory === 'client')
+        .map(item => ({
+          name: formatManagedPackageChoice(item),
+          value: item.id,
+        })),
+      new inquirer.Separator('---------- 账号 / token 供应商 ----------'),
+      ...statuses
+        .filter(item => item.accountCategory === 'provider')
+        .map(item => ({
+          name: formatManagedPackageChoice(item),
+          value: item.id,
+        })),
+    ],
   })
 }
 
@@ -439,6 +547,17 @@ export async function runClaudeCodeToolsMenu(): Promise<void> {
     subtitle: '统一管理 Claude Code、ccusage、CCR 与 CCometixLine',
     selectMessage: '选择要管理的 Claude Code 工具',
     continueMessage: '按 Enter 返回 Claude Code 工具菜单...',
+  })
+}
+
+export async function runModelUsageMenu(): Promise<void> {
+  await runManagedPackageMenu(MODEL_USAGE_PACKAGES, {
+    title: '模型使用统计',
+    subtitle: '统一运行 Claude Code、Codex 与网页版的模型使用统计命令',
+    selectMessage: '选择要运行的模型使用统计工具',
+    continueMessage: '按 Enter 返回模型使用统计菜单...',
+    silentDetection: true,
+    showRefresh: false,
   })
 }
 

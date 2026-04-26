@@ -37,6 +37,7 @@ export type { SkillMeta } from './skill-registry'
 export {
   buildPowerShellDetectionCommand,
   detectBaseEnvironmentToolStatuses,
+  getBaseEnvironmentDetectionAttempts,
   getBaseEnvironmentTools,
   SCIENTIFIC_INTERNET_GUIDE_URL,
 } from './installer-base-environment'
@@ -52,6 +53,22 @@ export {
   listAgentSkillDirectories,
 } from './installer-paths'
 export type { AgentSkillDirectory } from './installer-paths'
+
+export {
+  backupFileIfExists,
+  getPromptProfileDefinition,
+  getPromptProfileDefinitions,
+  getTimestampedBackupPath,
+  listPromptBackupEntries,
+  readPromptFile,
+  restorePromptFileFromBackup,
+  writePromptFileWithBackup,
+} from './prompt-files'
+export type {
+  PromptBackupEntry,
+  PromptProfileDefinition,
+  PromptProfileId,
+} from './prompt-files'
 
 export {
   installWorkflows,

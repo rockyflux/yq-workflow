@@ -1,11 +1,12 @@
-import { spawn } from 'node:child_process'
+import { execFile, spawn } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
-import type { ServerResponse } from 'node:http'
+import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { basename, extname } from 'node:path'
 import ansis from 'ansis'
 import fs from 'fs-extra'
+import { SKILLS_SH_URL } from './menu-constants'
 import { getCcgDir } from '../utils/config'
 import type { HelpRootId } from '../utils/help-web'
 import { buildHelpTree, getHelpRootDefinition, getHelpRootDefinitions, resolveHelpFilePath } from '../utils/help-web'
@@ -18,6 +19,13 @@ type HelpWebOptions = {
 type HelpPayload = {
   roots: Array<{ id: string, label: string, path: string }>
   defaultRootId: string
+}
+
+type SkillsCliResult = {
+  command: string
+  stdout: string
+  stderr: string
+  exitCode: number
 }
 
 type HelpWebState = {
@@ -135,6 +143,43 @@ export async function startHelpWebServer(options: HelpWebOptions = {}): Promise<
             rendered: renderPreview(relativePath, content),
           },
         })
+        return
+      }
+
+      if (requestUrl.pathname === '/api/skills/list') {
+        const result = await runSkillsCli(['list', '-g'])
+        sendJson(res, result)
+        return
+      }
+
+      if (requestUrl.pathname === '/api/skills/search') {
+        const query = requestUrl.searchParams.get('query')?.trim() || ''
+        if (!query) {
+          sendJson(res, { error: '缺少检索关键词' }, 400)
+          return
+        }
+
+        const result = await runSkillsCli(['find', query])
+        sendJson(res, result)
+        return
+      }
+
+      if (requestUrl.pathname === '/api/skills/install' && req.method === 'POST') {
+        const body = await readJsonBody(req)
+        const source = typeof body?.source === 'string' ? body.source.trim() : ''
+        if (!source) {
+          sendJson(res, { error: '缺少要安装的 Skills 来源' }, 400)
+          return
+        }
+
+        const result = await runSkillsCli(['add', source, '-g'])
+        sendJson(res, result)
+        return
+      }
+
+      if (requestUrl.pathname === '/api/skills/update' && req.method === 'POST') {
+        const result = await runSkillsCli(['update', '-g', '-y'])
+        sendJson(res, result)
         return
       }
 
@@ -412,6 +457,57 @@ function sendJson(res: ServerResponse, data: unknown, status = 200): void {
   res.end(JSON.stringify(data))
 }
 
+async function readJsonBody(req: IncomingMessage): Promise<any> {
+  const chunks: Buffer[] = []
+  for await (const chunk of req) {
+    chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk)
+  }
+
+  if (chunks.length === 0) {
+    return {}
+  }
+
+  return JSON.parse(Buffer.concat(chunks).toString('utf-8'))
+}
+
+async function runSkillsCli(args: string[]): Promise<SkillsCliResult> {
+  const isWindows = process.platform === 'win32'
+  const command = isWindows ? 'cmd.exe' : 'npx'
+  const cliArgs = isWindows
+    ? ['/d', '/s', '/c', 'npx', 'skills', ...args]
+    : ['skills', ...args]
+
+  return new Promise((resolve) => {
+    execFile(command, cliArgs, {
+      cwd: process.cwd(),
+      env: process.env,
+      maxBuffer: 10 * 1024 * 1024,
+      windowsHide: true,
+    }, (error, stdout, stderr) => {
+      if (error) {
+        const exitCode = typeof (error as NodeJS.ErrnoException & { code?: unknown }).code === 'number'
+          ? Number((error as NodeJS.ErrnoException & { code?: unknown }).code)
+          : 1
+
+        resolve({
+          command: `${command} skills ${args.join(' ')}`,
+          stdout: stdout?.toString() || '',
+          stderr: stderr?.toString() || error.message || '命令执行失败',
+          exitCode,
+        })
+        return
+      }
+
+      resolve({
+        command: `${command} skills ${args.join(' ')}`,
+        stdout: stdout?.toString() || '',
+        stderr: stderr?.toString() || '',
+        exitCode: 0,
+      })
+    })
+  })
+}
+
 function renderPreview(relativePath: string, content: string): string {
   return `<pre>${escapeHtml(content)}</pre>`
 }
@@ -444,8 +540,10 @@ function renderAppHtml(): string {
     button { cursor:pointer; font-weight:600; }
     .meta { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:20px; }
     .pill { border:1px solid var(--border); border-radius:999px; background:#fff; padding:12px 10px; color:var(--muted); }
-    .layout { display:grid; grid-template-columns:minmax(280px, 320px) minmax(0, 1fr); gap:16px; height:calc(100vh - 210px); min-height:560px; }
+    .layout { display:grid; grid-template-columns:minmax(280px, 320px) minmax(0, 1fr); gap:16px; min-height:560px; }
+    .content-grid { display:grid; grid-template-rows:minmax(320px, 1fr) minmax(280px, auto); gap:16px; min-height:calc(100vh - 210px); }
     .panel { background:var(--panel); border:1px solid var(--border); border-radius:14px;}
+    .panel.hidden { display:none; }
     .panel-header { padding:20px 24px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; gap:12px; }
     .panel-header h2 { margin:0; font-size:18px; }
     .panel-body { padding:15px; }
@@ -469,10 +567,16 @@ function renderAppHtml(): string {
     .preview ul { padding-left:22px; }
     .preview pre { background:#333333;color:#ffffff;border:1px solid var(--border); border-radius:16px; padding:16px; overflow:auto; font-size:14px; }
     .preview code {border-radius:6px; padding:2px 6px; font-size:.92em; }
+    .skills-actions { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px; }
+    .skills-actions button, .skills-actions a { display:inline-flex; align-items:center; justify-content:center; min-width:120px; min-height:44px; padding:0 16px; border:1px solid var(--border); border-radius:14px; background:#fff; color:var(--text); text-decoration:none; font-size:15px; font-weight:600; }
+    .skills-tip { margin:0 0 16px; color:var(--muted); line-height:1.7; }
+    .skills-status { min-height:24px; margin-bottom:14px; color:var(--muted); }
+    .skills-output { margin:0; min-height:220px; max-height:420px; overflow:auto; white-space:pre-wrap; word-break:break-word; background:#111827; color:#f8fafc; border-radius:14px; padding:16px; font:14px/1.6 Consolas, monospace; }
     .scroll-top-btn { position:fixed; right:28px; bottom:28px; z-index:20; display:none; align-items:center; justify-content:center; width:52px; height:52px; border:1px solid var(--border); border-radius:999px; background:#fff; box-shadow:0 12px 28px rgba(15, 23, 42, .12); color:var(--accent); }
     .scroll-top-btn.visible { display:flex; }
     @media (max-width: 1080px) {
-      .layout { grid-template-columns:1fr; height:auto; min-height:auto; }
+      .layout { grid-template-columns:1fr; min-height:auto; }
+      .content-grid { min-height:auto; }
       .title h1 { font-size:42px; }
       input { min-width:240px; width:100%; }
       .controls { width:100%; }
@@ -493,6 +597,7 @@ function renderAppHtml(): string {
         <span>目录</span>
         <select id="rootSelect"></select>
         <button id="refreshBtn" type="button">刷新</button>
+        <button id="skillsPanelBtn" type="button">Skills.sh</button>
         <button id="closeBtn" type="button">关闭服务</button>
       </div>
     </div>
@@ -509,12 +614,29 @@ function renderAppHtml(): string {
           <div id="treeContainer"></div>
         </div>
       </section>
-      <section class="panel">
-        <div class="panel-header"><h2>预览</h2></div>
-        <div class="panel-body">
-          <div id="previewContainer" class="empty">请选择左侧文件进行预览。</div>
-        </div>
-      </section>
+      <div class="content-grid">
+        <section id="previewPanel" class="panel">
+          <div class="panel-header"><h2>预览</h2></div>
+          <div class="panel-body">
+            <div id="previewContainer" class="empty">请选择左侧文件进行预览。</div>
+          </div>
+        </section>
+        <section id="skillsPanel" class="panel hidden">
+          <div class="panel-header"><h2>Skills.sh</h2></div>
+          <div class="panel-body">
+            <p class="skills-tip">已把查看全局已安装 Skills、检索安装、指定安装、更新全局 Skills 和 skills.sh 官网入口整合到这里。</p>
+            <div class="skills-actions">
+              <button id="listSkillsBtn" type="button">查看已安装</button>
+              <button id="searchSkillsBtn" type="button">检索并安装</button>
+              <button id="installSkillsBtn" type="button">安装指定包</button>
+              <button id="updateSkillsBtn" type="button">更新全局 Skills</button>
+              <a href="${SKILLS_SH_URL}" target="_blank" rel="noreferrer">打开 skills.sh</a>
+            </div>
+            <div id="skillsStatus" class="skills-status">点击上面的操作按钮后，会在这里显示 npx skills 的执行结果。</div>
+            <pre id="skillsOutput" class="skills-output">等待操作...</pre>
+          </div>
+        </section>
+      </div>
     </div>
   </div>
   <button id="scrollTopBtn" class="scroll-top-btn" type="button" aria-label="回到顶部" title="回到顶部">↑</button>
@@ -524,13 +646,22 @@ function renderAppHtml(): string {
     const rootSelect = document.getElementById('rootSelect');
     const searchInput = document.getElementById('search');
     const refreshBtn = document.getElementById('refreshBtn');
+    const skillsPanelBtn = document.getElementById('skillsPanelBtn');
     const closeBtn = document.getElementById('closeBtn');
     const treeContainer = document.getElementById('treeContainer');
+    const previewPanel = document.getElementById('previewPanel');
+    const skillsPanel = document.getElementById('skillsPanel');
     const previewContainer = document.getElementById('previewContainer');
     const treeRootPath = document.getElementById('treeRootPath');
     const currentRootLabel = document.getElementById('currentRootLabel');
     const treeCount = document.getElementById('treeCount');
     const scrollTopBtn = document.getElementById('scrollTopBtn');
+    const listSkillsBtn = document.getElementById('listSkillsBtn');
+    const searchSkillsBtn = document.getElementById('searchSkillsBtn');
+    const installSkillsBtn = document.getElementById('installSkillsBtn');
+    const updateSkillsBtn = document.getElementById('updateSkillsBtn');
+    const skillsStatus = document.getElementById('skillsStatus');
+    const skillsOutput = document.getElementById('skillsOutput');
 
     init();
 
@@ -552,12 +683,21 @@ function renderAppHtml(): string {
       });
       searchInput.addEventListener('input', () => applySearch());
       refreshBtn.addEventListener('click', loadTree);
+      skillsPanelBtn.addEventListener('click', () => showPane('skills'));
       closeBtn.addEventListener('click', closeService);
+      listSkillsBtn.addEventListener('click', () => handleSkillsAction({
+        label: '查看全局已安装 Skills',
+        run: () => fetchJson('/api/skills/list'),
+      }));
+      searchSkillsBtn.addEventListener('click', searchAndInstallSkill);
+      installSkillsBtn.addEventListener('click', installSkillBySource);
+      updateSkillsBtn.addEventListener('click', updateGlobalSkills);
       scrollTopBtn.addEventListener('click', () => {
         window.scrollTo({ top: 0, behavior: 'smooth' });
       });
       window.addEventListener('scroll', syncScrollTopButton, { passive: true });
       syncScrollTopButton();
+      showPane('preview');
       await loadTree();
     }
 
@@ -612,6 +752,7 @@ function renderAppHtml(): string {
       treeContainer.querySelectorAll('[data-file-path]').forEach(element => {
         element.addEventListener('click', async () => {
           state.selectedPath = element.getAttribute('data-file-path');
+          showPane('preview');
           renderTree();
           await loadFile(state.selectedPath);
         });
@@ -672,6 +813,7 @@ function renderAppHtml(): string {
       }
       const firstFile = pickFirstFile(state.filteredTree);
       if (!firstFile) {
+        showPane('preview');
         previewContainer.innerHTML = '<div class="empty">请选择左侧文件进行预览。</div>';
         state.selectedPath = '';
         return;
@@ -709,7 +851,7 @@ function renderAppHtml(): string {
         '<div class="file-meta">' +
           '<span class="badge">类型：文件</span>' +
           '<span class="badge">扩展名：' + escapeHtml(file.extension || '无') + '</span>' +
-          '<span class="badge">大小：' + file.size + ' B</span>' +
+          '<span class="badge">大小：' + formatFileSize(file.size) + '</span>' +
         '</div>' +
         '<div class="file-meta"><span>' + escapeHtml(file.path) + '</span></div>' +
         '<div class="preview">' + renderedContent + '</div>';
@@ -726,6 +868,24 @@ function renderAppHtml(): string {
       return '<pre>' + escapeHtml(content) + '</pre>';
     }
 
+    function formatFileSize(size) {
+      const value = Number(size) || 0;
+      if (value < 1024) {
+        return value + ' B';
+      }
+
+      const units = ['KB', 'MB', 'GB', 'TB'];
+      let nextValue = value / 1024;
+      let unitIndex = 0;
+      while (nextValue >= 1024 && unitIndex < units.length - 1) {
+        nextValue = nextValue / 1024;
+        unitIndex += 1;
+      }
+
+      const digits = nextValue >= 100 ? 0 : nextValue >= 10 ? 1 : 2;
+      return nextValue.toFixed(digits).replace(/\.0+$/, '').replace(/(\.\d*[1-9])0+$/, '$1') + ' ' + units[unitIndex];
+    }
+
     function syncScrollTopButton() {
       if (window.scrollY > 240) {
         scrollTopBtn.classList.add('visible');
@@ -735,13 +895,127 @@ function renderAppHtml(): string {
       }
     }
 
-    async function fetchJson(url) {
-      const response = await fetch(url);
+    async function fetchJson(url, init) {
+      const response = await fetch(url, init);
       const payload = await response.json();
       if (!response.ok) {
         throw new Error(payload.error || '请求失败');
       }
       return payload;
+    }
+
+    async function searchAndInstallSkill() {
+      showPane('skills');
+      const query = window.prompt('输入要检索的关键词');
+      if (!query || !query.trim()) {
+        return;
+      }
+
+      const searchResult = await handleSkillsAction({
+        label: '检索 Skills.sh',
+        run: () => fetchJson('/api/skills/search?query=' + encodeURIComponent(query.trim())),
+      });
+
+      if (!searchResult || searchResult.exitCode !== 0) {
+        return;
+      }
+
+      const source = window.prompt('输入 owner/repo 或 owner/repo@skill 继续安装，留空返回');
+      if (!source || !source.trim()) {
+        return;
+      }
+
+      await runInstallSkill(source.trim(), '安装检索结果');
+    }
+
+    async function installSkillBySource() {
+      showPane('skills');
+      const source = window.prompt('输入 owner/repo 或 owner/repo@skill');
+      if (!source || !source.trim()) {
+        return;
+      }
+
+      await runInstallSkill(source.trim(), '安装指定 Skills 包');
+    }
+
+    async function runInstallSkill(source, label) {
+      showPane('skills');
+      await handleSkillsAction({
+        label: label + '：' + source,
+        run: () => fetchJson('/api/skills/install', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ source }),
+        }),
+      });
+    }
+
+    async function updateGlobalSkills() {
+      showPane('skills');
+      const confirmed = window.confirm('确认更新全局 Skills？');
+      if (!confirmed) {
+        return;
+      }
+
+      await handleSkillsAction({
+        label: '更新全局 Skills',
+        run: () => fetchJson('/api/skills/update', {
+          method: 'POST',
+        }),
+      });
+    }
+
+    async function handleSkillsAction(options) {
+      showPane('skills');
+      setSkillsBusy(true);
+      skillsStatus.textContent = options.label + '，请稍候...';
+      skillsOutput.textContent = '执行中...';
+
+      try {
+        const result = await options.run();
+        renderSkillsResult(options.label, result);
+        return result;
+      }
+      catch (error) {
+        const message = error instanceof Error ? error.message : '请求失败';
+        skillsStatus.textContent = options.label + '失败';
+        skillsOutput.textContent = message;
+        window.alert(message);
+        return null;
+      }
+      finally {
+        setSkillsBusy(false);
+      }
+    }
+
+    function renderSkillsResult(label, result) {
+      const ok = Number(result.exitCode) === 0;
+      const sections = ['$ ' + (result.command || 'npx skills')];
+
+      if (result.stdout) {
+        sections.push(result.stdout.trimEnd());
+      }
+      if (result.stderr) {
+        sections.push('[stderr]\\n' + result.stderr.trimEnd());
+      }
+      if (!result.stdout && !result.stderr) {
+        sections.push('(无输出)');
+      }
+
+      skillsStatus.textContent = label + (ok ? '完成' : '失败') + '，退出码 ' + String(result.exitCode);
+      skillsOutput.textContent = sections.join('\\n\\n');
+    }
+
+    function setSkillsBusy(busy) {
+      [listSkillsBtn, searchSkillsBtn, installSkillsBtn, updateSkillsBtn].forEach(button => {
+        button.disabled = busy;
+      });
+    }
+
+    function showPane(target) {
+      const isSkills = target === 'skills';
+      previewPanel.classList.toggle('hidden', isSkills);
+      skillsPanel.classList.toggle('hidden', !isSkills);
     }
 
     async function closeService() {

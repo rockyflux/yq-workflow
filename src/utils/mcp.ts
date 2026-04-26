@@ -1,16 +1,10 @@
-/**
- * MCP (Model Context Protocol) configuration utilities
- * Adapted from zcf project's claude-config.ts and features.ts
- */
-
 import { homedir } from 'node:os'
-import { join } from 'pathe'
+import { basename, dirname, join } from 'pathe'
 import fs from 'fs-extra'
+import { parse, stringify } from 'smol-toml'
+import { getCodexDir } from './installer-paths'
 import { getMcpCommand, isWindows } from './platform'
 
-/**
- * MCP Server Configuration interface
- */
 export interface McpServerConfig {
   type: 'stdio' | 'sse'
   command?: string
@@ -20,127 +14,172 @@ export interface McpServerConfig {
   startup_timeout_ms?: number
 }
 
-/**
- * Claude Code Configuration interface
- */
 export interface ClaudeCodeConfig {
   mcpServers?: Record<string, McpServerConfig>
   hasCompletedOnboarding?: boolean
-  customApiKeyResponses?: {
-    approved: string[]
-    rejected: string[]
-  }
+  customApiKeyResponses?: { approved: string[], rejected: string[] }
   env?: Record<string, string>
   primaryApiKey?: string
   installMethod?: 'npm-global' | 'native'
-  // ... other fields preserved
   [key: string]: any
 }
 
-/**
- * Get Claude Code config path (~/.claude.json)
- */
-export function getClaudeCodeConfigPath(): string {
-  return join(homedir(), '.claude.json')
+export type McpClientId = 'claude' | 'codex' | 'gemini'
+
+type McpConfigDocument = Record<string, any>
+
+export type McpClientDefinition = {
+  id: McpClientId
+  label: string
+  configPath: string
+  format: 'json' | 'toml'
 }
 
-/**
- * Read Claude Code config from ~/.claude.json
- */
-export async function readClaudeCodeConfig(): Promise<ClaudeCodeConfig | null> {
-  const configPath = getClaudeCodeConfigPath()
+export function getClaudeCodeConfigPath(): string {
+  return process.env.YQ_CLAUDE_CONFIG_PATH || join(homedir(), '.claude.json')
+}
+
+export function getCodexMcpConfigPath(): string {
+  return process.env.YQ_CODEX_CONFIG_PATH || join(getCodexDir(), 'config.toml')
+}
+
+export function getGeminiMcpConfigPath(): string {
+  return process.env.YQ_GEMINI_SETTINGS_PATH || join(homedir(), '.gemini', 'settings.json')
+}
+
+export function getMcpClientDefinitions(): McpClientDefinition[] {
+  return [
+    { id: 'claude', label: 'Claude', configPath: getClaudeCodeConfigPath(), format: 'json' },
+    { id: 'codex', label: 'Codex', configPath: getCodexMcpConfigPath(), format: 'toml' },
+    { id: 'gemini', label: 'Gemini', configPath: getGeminiMcpConfigPath(), format: 'json' },
+  ]
+}
+
+export function getMcpClientDefinition(clientId: McpClientId): McpClientDefinition {
+  return getMcpClientDefinitions().find(item => item.id === clientId) || getMcpClientDefinitions()[0]
+}
+
+export async function readMcpClientConfig(clientId: McpClientId): Promise<McpConfigDocument | null> {
+  const client = getMcpClientDefinition(clientId)
+  if (!(await fs.pathExists(client.configPath))) {
+    return null
+  }
 
   try {
-    if (!(await fs.pathExists(configPath))) {
-      return null
-    }
-
-    const content = await fs.readFile(configPath, 'utf-8')
-    return JSON.parse(content) as ClaudeCodeConfig
+    const content = await fs.readFile(client.configPath, 'utf-8')
+    return client.format === 'toml'
+      ? parse(content) as McpConfigDocument
+      : JSON.parse(content) as McpConfigDocument
   }
   catch (error) {
-    console.error('Failed to read Claude Code config:', error)
+    console.error(`Failed to read ${client.label} MCP config:`, error)
     return null
   }
 }
 
-/**
- * Write Claude Code config to ~/.claude.json
- */
-export async function writeClaudeCodeConfig(config: ClaudeCodeConfig): Promise<void> {
-  const configPath = getClaudeCodeConfigPath()
+export async function writeMcpClientConfig(clientId: McpClientId, config: McpConfigDocument): Promise<void> {
+  const client = getMcpClientDefinition(clientId)
+  await fs.ensureDir(dirname(client.configPath))
+  const content = client.format === 'toml'
+    ? `${stringify(config as never)}\n`
+    : `${JSON.stringify(config, null, 2)}\n`
 
-  try {
-    await fs.writeFile(configPath, JSON.stringify(config, null, 2), 'utf-8')
-  }
-  catch (error) {
-    throw new Error(`Failed to write Claude Code config: ${error}`)
-  }
+  await fs.writeFile(client.configPath, content, 'utf-8')
 }
 
-/**
- * Apply platform-specific command wrapper to MCP server config
- * On Windows, npx/uvx commands need cmd /c wrapper
- *
- * @param config - MCP server configuration to modify
- */
+export async function backupMcpClientConfig(clientId: McpClientId): Promise<string | null> {
+  const client = getMcpClientDefinition(clientId)
+  if (!(await fs.pathExists(client.configPath))) {
+    return null
+  }
+
+  const backupDir = join(dirname(client.configPath), `${basename(client.configPath, client.format === 'toml' ? '.toml' : '.json')}-backup`)
+  const backupPath = join(backupDir, `${basename(client.configPath)}.bak-${new Date().toISOString().replace(/[:.]/g, '-')}`)
+  await fs.ensureDir(backupDir)
+  await fs.copy(client.configPath, backupPath, { overwrite: false, errorOnExist: true })
+  return backupPath
+}
+
+export function getMcpServersFromConfig(clientId: McpClientId, config: McpConfigDocument | null): Record<string, McpServerConfig> {
+  if (!config || typeof config !== 'object') {
+    return {}
+  }
+
+  if (clientId === 'codex') {
+    return ((config.mcp_servers || {}) as Record<string, McpServerConfig>)
+  }
+
+  return ((config.mcpServers || {}) as Record<string, McpServerConfig>)
+}
+
+export function setMcpServersInConfig(
+  clientId: McpClientId,
+  config: McpConfigDocument | null,
+  servers: Record<string, McpServerConfig>,
+): McpConfigDocument {
+  const nextConfig = config ? JSON.parse(JSON.stringify(config)) as McpConfigDocument : {}
+  if (clientId === 'codex') {
+    nextConfig.mcp_servers = servers
+    return nextConfig
+  }
+
+  nextConfig.mcpServers = servers
+  return nextConfig
+}
+
+export async function listConfiguredMcpServers(clientId: McpClientId): Promise<Record<string, McpServerConfig>> {
+  return getMcpServersFromConfig(clientId, await readMcpClientConfig(clientId))
+}
+
+export async function upsertMcpServer(clientId: McpClientId, serverId: string, serverConfig: McpServerConfig): Promise<void> {
+  const currentConfig = await readMcpClientConfig(clientId)
+  const currentServers = getMcpServersFromConfig(clientId, currentConfig)
+  currentServers[serverId] = serverConfig
+  const nextConfig = setMcpServersInConfig(clientId, currentConfig, currentServers)
+  await writeMcpClientConfig(clientId, clientId === 'claude' ? fixWindowsMcpConfig(nextConfig as ClaudeCodeConfig) : nextConfig)
+}
+
+export async function removeMcpServerFromClient(clientId: McpClientId, serverId: string): Promise<void> {
+  const currentConfig = await readMcpClientConfig(clientId)
+  const currentServers = getMcpServersFromConfig(clientId, currentConfig)
+  delete currentServers[serverId]
+  await writeMcpClientConfig(clientId, setMcpServersInConfig(clientId, currentConfig, currentServers))
+}
+
 export function applyPlatformCommand(config: McpServerConfig): void {
-  // Only process if command exists (avoid wrapping SSE services)
-  if (isWindows() && config.command) {
-    // 幂等性检查：如果 command 已经是 'cmd'，说明已处理过，跳过
-    if (config.command === 'cmd') {
-      return
-    }
+  if (!isWindows() || !config.command || config.command === 'cmd') {
+    return
+  }
 
-    const mcpCmd = getMcpCommand(config.command)
-
-    // Only modify if command needs Windows wrapper (cmd /c)
-    if (mcpCmd[0] === 'cmd') {
-      const originalArgs = config.args || []
-      config.command = mcpCmd[0] // 'cmd'
-      // getMcpCommand 已返回 ['cmd', '/c', 'npx']，slice(1) = ['/c', 'npx']
-      config.args = [...mcpCmd.slice(1), ...originalArgs]
-    }
+  const mcpCmd = getMcpCommand(config.command)
+  if (mcpCmd[0] === 'cmd') {
+    config.command = mcpCmd[0]
+    config.args = [...mcpCmd.slice(1), ...(config.args || [])]
   }
 }
 
-/**
- * Build MCP server config with platform-specific adjustments
- *
- * @param baseConfig - Base MCP server configuration
- * @param apiKey - Optional API key to inject
- * @param placeholder - Placeholder to replace with API key
- * @param envVarName - Optional environment variable name for API key
- * @returns Platform-adjusted MCP server configuration
- */
 export function buildMcpServerConfig(
   baseConfig: McpServerConfig,
   apiKey?: string,
-  placeholder: string = 'YOUR_API_KEY',
+  placeholder = 'YOUR_API_KEY',
   envVarName?: string,
 ): McpServerConfig {
-  // Deep clone to avoid mutation
   const config = JSON.parse(JSON.stringify(baseConfig)) as McpServerConfig
-
-  // Apply platform-specific command wrapper
   applyPlatformCommand(config)
 
   if (!apiKey) {
     return config
   }
 
-  // Method 1: Set environment variable directly (recommended)
   if (envVarName && config.env) {
     config.env[envVarName] = apiKey
     return config
   }
 
-  // Method 2: Replace placeholder in args (legacy)
   if (config.args) {
     config.args = config.args.map(arg => arg.replace(placeholder, apiKey))
   }
 
-  // Method 3: Replace placeholder in URL (for SSE services)
   if (config.url) {
     config.url = config.url.replace(placeholder, apiKey)
   }
@@ -148,161 +187,82 @@ export function buildMcpServerConfig(
   return config
 }
 
-/**
- * Repair corrupted Windows MCP configuration
- * Fixes issues like duplicated commands in args array
- *
- * @param config - MCP server configuration to repair
- * @returns true if config was repaired, false if no repair needed
- */
 export function repairCorruptedMcpArgs(config: McpServerConfig): boolean {
   if (!isWindows() || config.command !== 'cmd' || !config.args) {
     return false
   }
 
-  const args = config.args
   let repaired = false
-
-  // 检测并修复 args 开头的错误模式
-  // 正确格式: ['/c', 'npx', '-y', ...]
-  // 错误格式1: ['cmd', '/c', 'npx', ...] (开头多余的 cmd)
-  // 错误格式2: ['/c', 'npx', 'npx', ...] (重复的命令)
-  // 错误格式3: ['cmd', '/c', 'npx', 'npx', ...] (两种错误的组合)
-
-  // 移除开头多余的 'cmd'
-  if (args[0] === 'cmd') {
-    args.shift()
+  if (config.args[0] === 'cmd') {
+    config.args.shift()
     repaired = true
   }
 
-  // 确保第一个是 '/c'
-  if (args[0] !== '/c') {
-    return repaired
-  }
-
-  // 检测并移除重复的命令 (如 'npx', 'npx')
-  if (args.length >= 3 && args[1] === args[2]) {
-    args.splice(2, 1) // 移除重复的命令
+  if (config.args[0] === '/c' && config.args.length >= 3 && config.args[1] === config.args[2]) {
+    config.args.splice(2, 1)
     repaired = true
   }
 
   return repaired
 }
 
-/**
- * Fix Windows MCP configuration by applying platform wrappers
- * This function processes all MCP servers in the config and applies Windows-specific fixes
- *
- * @param config - Claude Code configuration
- * @returns Fixed configuration with Windows command wrappers
- */
 export function fixWindowsMcpConfig(config: ClaudeCodeConfig): ClaudeCodeConfig {
   if (!isWindows() || !config.mcpServers) {
     return config
   }
 
-  // Clone config to avoid mutation
   const fixed = JSON.parse(JSON.stringify(config)) as ClaudeCodeConfig
-
-  // Fix each MCP server configuration
-  for (const [serverName, serverConfig] of Object.entries(fixed.mcpServers || {})) {
-    if (serverConfig && typeof serverConfig === 'object' && 'command' in serverConfig) {
-      const mcpConfig = serverConfig as McpServerConfig
-      // 先尝试修复损坏的配置
-      repairCorruptedMcpArgs(mcpConfig)
-      // 再应用平台命令包装（幂等，已处理过的会跳过）
-      applyPlatformCommand(mcpConfig)
-    }
+  for (const serverConfig of Object.values(fixed.mcpServers || {})) {
+    repairCorruptedMcpArgs(serverConfig)
+    applyPlatformCommand(serverConfig)
   }
-
   return fixed
 }
 
-/**
- * Merge new MCP servers into existing configuration
- * Preserves all other fields in the config
- *
- * @param existing - Existing Claude Code configuration (or null)
- * @param newServers - New MCP servers to add/update
- * @returns Merged configuration
- */
 export function mergeMcpServers(
   existing: ClaudeCodeConfig | null,
   newServers: Record<string, McpServerConfig>,
 ): ClaudeCodeConfig {
   const config: ClaudeCodeConfig = existing || { mcpServers: {} }
-
-  if (!config.mcpServers) {
-    config.mcpServers = {}
-  }
-
-  // Merge new servers (will override existing servers with same name)
-  Object.assign(config.mcpServers, newServers)
-
+  config.mcpServers = { ...(config.mcpServers || {}), ...newServers }
   return config
 }
 
-/**
- * Create backup of Claude Code config
- * @returns Backup file path or null if failed
- */
-export async function backupClaudeCodeConfig(): Promise<string | null> {
-  const configPath = getClaudeCodeConfigPath()
-
-  try {
-    if (!(await fs.pathExists(configPath))) {
-      return null
-    }
-
-    const backupDir = join(homedir(), '.claude', 'backup')
-    await fs.ensureDir(backupDir)
-
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
-    const backupPath = join(backupDir, `claude-config-${timestamp}.json`)
-
-    await fs.copy(configPath, backupPath)
-    return backupPath
-  }
-  catch (error) {
-    console.error('Failed to backup Claude Code config:', error)
-    return null
-  }
+export async function readClaudeCodeConfig(): Promise<ClaudeCodeConfig | null> {
+  return await readMcpClientConfig('claude') as ClaudeCodeConfig | null
 }
 
-/**
- * Diagnose MCP configuration issues
- * @returns Array of diagnostic messages
- */
+export async function writeClaudeCodeConfig(config: ClaudeCodeConfig): Promise<void> {
+  await writeMcpClientConfig('claude', config)
+}
+
+export async function backupClaudeCodeConfig(): Promise<string | null> {
+  return await backupMcpClientConfig('claude')
+}
+
 export async function diagnoseMcpConfig(): Promise<string[]> {
   const issues: string[] = []
   const configPath = getClaudeCodeConfigPath()
-
-  // Check if config file exists
   if (!(await fs.pathExists(configPath))) {
     issues.push('❌ ~/.claude.json does not exist')
     return issues
   }
 
-  // Try to read and parse config
   const config = await readClaudeCodeConfig()
   if (!config) {
     issues.push('❌ Failed to parse ~/.claude.json')
     return issues
   }
 
-  // Check if mcpServers exists
   if (!config.mcpServers || Object.keys(config.mcpServers).length === 0) {
     issues.push('⚠️  No MCP servers configured')
     return issues
   }
 
-  // Check Windows-specific issues
   if (isWindows()) {
     for (const [name, server] of Object.entries(config.mcpServers)) {
-      if (server.command && ['npx', 'uvx', 'node'].includes(server.command)) {
-        if (server.command !== 'cmd') {
-          issues.push(`❌ ${name}: Command not properly wrapped for Windows (should use cmd /c)`)
-        }
+      if (server.command && ['npx', 'uvx', 'node'].includes(server.command) && server.command !== 'cmd') {
+        issues.push(`❌ ${name}: Command not properly wrapped for Windows (should use cmd /c)`)
       }
     }
   }

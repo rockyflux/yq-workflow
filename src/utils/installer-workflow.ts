@@ -6,6 +6,7 @@ import { basename, dirname, join } from 'pathe'
 import { promisify } from 'node:util'
 import { getWorkflowById } from './installer-data'
 import { getAgentSkillsDir, getCodexDir } from './installer-paths'
+import { backupFileIfExists } from './prompt-files'
 import { PACKAGE_ROOT, injectConfigVariables, replaceHomePathsInTemplate } from './installer-template'
 import { installSkillCommands } from './skill-registry'
 
@@ -57,24 +58,6 @@ async function copyMdTemplates(
     installed.push(file.replace('.md', ''))
   }
   return installed
-}
-
-function getBackupFilePath(filePath: string): string {
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
-  return `${filePath}.bak-${timestamp}`
-}
-
-async function backupFileIfExists(filePath: string): Promise<string | null> {
-  if (!(await fs.pathExists(filePath))) return null
-
-  const stats = await fs.lstat(filePath)
-  if (!stats.isFile()) {
-    throw new Error(`Destination exists but is not a file: ${filePath}`)
-  }
-
-  const backupPath = getBackupFilePath(filePath)
-  await fs.copy(filePath, backupPath, { overwrite: false, errorOnExist: true })
-  return backupPath
 }
 
 async function installTemplateFile(

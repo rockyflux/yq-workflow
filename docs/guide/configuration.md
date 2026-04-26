@@ -17,7 +17,7 @@
 └── superpowers/            # templates/superpowers/ 的镜像
 ```
 
-## 常用命令入口
+## 主菜单对应命令
 
 ```bash
 npx yq-workflow
@@ -25,13 +25,12 @@ npx yq-workflow menu
 npx yq-workflow init
 npx yq-workflow update
 npx yq-workflow help
+npx yq-workflow config prompt
 npx yq-workflow config skills
-npx yq-workflow config skills-web
-npx yq-workflow config skills-web-close
 npx yq-workflow config mcp
-npx yq-workflow config api
-npx yq-workflow diagnose-mcp
 ```
+
+帮助页只展示这组“主菜单有对应入口”的命令。`config *-web`、`config api`、`diagnose-mcp`、`fix-mcp` 等 CLI 直达命令仍可单独执行，但不放在帮助页主列表中。
 
 ## 主菜单包含什么
 
@@ -46,7 +45,7 @@ npx yq-workflow diagnose-mcp
 - 配置 Skills：第一个入口就是“本地网页版 Skills”，默认打开 `.agents/skills`，并可切换 `.claude/skills`、`.codex/skills`、`.gemini/skills`
 - 本地网页版 Skills 若已运行，再次打开会复用现有页面；可在 Skills 菜单里关闭，也可执行 `npx yq-workflow config skills-web-close`
 - 网页右上角提供“关闭服务”按钮，可直接在浏览器里关闭当前 Skills 服务
-- 帮助页：仅显示常用 `npx` 命令与操作提示
+- 帮助页：仅显示主菜单对应的常用 `npx` 命令与操作提示
 
 ## 运行时约定
 
@@ -81,7 +80,7 @@ npx yq-workflow diagnose-mcp
 npx yq-workflow menu
 ```
 
-然后进入“配置 Skills”查看目录、网页预览和安装项。
+然后进入“配置 Skills”查看目录、网页预览和安装项。帮助页本身只列主菜单对应命令，不展开所有 CLI 子命令。
 
 **想直接用网页方式浏览 skills 文件树**
 

@@ -323,9 +323,14 @@ function getBaseEnvironmentToolDefinitions(): BaseEnvironmentToolDefinition[] {
       id: 'pnpm',
       label: 'pnpm',
       description: '检测 pnpm 包管理器并提供推荐安装方式',
-      detect: () => [
-        { command: 'pnpm', args: ['--version'], label: 'pnpm', versionPattern: /(\d+(?:\.\d+)+)/ },
-      ],
+      detect: platform => platform === 'win32'
+        ? [
+            { command: 'pnpm', args: ['--version'], label: 'pnpm', runner: 'powershell', versionPattern: /(\d+(?:\.\d+)+)/ },
+            { command: 'pnpm.cmd', args: ['--version'], label: 'pnpm.cmd', runner: 'powershell', versionPattern: /(\d+(?:\.\d+)+)/ },
+          ]
+        : [
+            { command: 'pnpm', args: ['--version'], label: 'pnpm', versionPattern: /(\d+(?:\.\d+)+)/ },
+          ],
       getDetail: version => version ? `已检测到 pnpm ${version}` : '未检测到 pnpm',
       installActions: {
         win32: [
@@ -363,7 +368,7 @@ function getBaseEnvironmentToolDefinitions(): BaseEnvironmentToolDefinition[] {
           },
         ],
       },
-      locateCommand: 'pnpm',
+      locateCommand: platform => platform === 'win32' ? 'pnpm.cmd' : 'pnpm',
     },
     {
       id: 'uv',
@@ -413,9 +418,14 @@ function getBaseEnvironmentToolDefinitions(): BaseEnvironmentToolDefinition[] {
       id: 'vscode',
       label: 'VS Code',
       description: '检测 VS Code CLI 并提供安装入口',
-      detect: () => [
-        { command: 'code', args: ['--version'], label: 'code', versionPattern: /(\d+(?:\.\d+)+)/ },
-      ],
+      detect: platform => platform === 'win32'
+        ? [
+            { command: 'code.cmd', args: ['--version'], label: 'code.cmd', runner: 'powershell', versionPattern: /^(\d+(?:\.\d+)+)$/m },
+            { command: 'code', args: ['--version'], label: 'code', runner: 'powershell', versionPattern: /^(\d+(?:\.\d+)+)$/m },
+          ]
+        : [
+            { command: 'code', args: ['--version'], label: 'code', versionPattern: /^(\d+(?:\.\d+)+)$/m },
+          ],
       getDetail: (version, _sourceLabel, _platform, commandPath) => {
         if (!version) return '未检测到 VS Code CLI (code)'
         return commandPath ? `已检测到 VS Code ${version} (${commandPath})` : `已检测到 VS Code ${version}`
@@ -454,9 +464,17 @@ function getBaseEnvironmentToolDefinitions(): BaseEnvironmentToolDefinition[] {
           },
         ],
       },
-      locateCommand: 'code',
+      locateCommand: platform => platform === 'win32' ? 'code.cmd' : 'code',
     },
   ]
+}
+
+export function getBaseEnvironmentDetectionAttempts(
+  toolId: BaseEnvironmentToolId,
+  platform: NodeJS.Platform = process.platform,
+): DetectionAttempt[] {
+  const tool = getBaseEnvironmentToolDefinitions().find(item => item.id === toolId)
+  return tool ? tool.detect(platform) : []
 }
 
 export function getBaseEnvironmentTools(platform: NodeJS.Platform = process.platform): BaseEnvironmentToolStatus[] {
