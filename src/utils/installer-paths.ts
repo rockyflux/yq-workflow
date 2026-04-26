@@ -16,6 +16,10 @@ export function getCodexDir(): string {
   return process.env.YQ_CODEX_DIR || join(homedir(), '.codex')
 }
 
+export function getCursorDir(): string {
+  return process.env.YQ_CURSOR_DIR || join(homedir(), '.cursor')
+}
+
 export async function listAgentSkillDirectories(rootDir = getAgentSkillsDir()): Promise<AgentSkillDirectory[]> {
   if (!(await fs.pathExists(rootDir))) {
     return []

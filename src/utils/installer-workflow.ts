@@ -5,7 +5,7 @@ import { exec } from 'node:child_process'
 import { basename, dirname, join } from 'pathe'
 import { promisify } from 'node:util'
 import { getWorkflowById } from './installer-data'
-import { getAgentSkillsDir, getCodexDir } from './installer-paths'
+import { getAgentSkillsDir, getCodexDir, getCursorDir } from './installer-paths'
 import { backupFileIfExists } from './prompt-files'
 import { PACKAGE_ROOT, injectConfigVariables, replaceHomePathsInTemplate } from './installer-template'
 import { installSkillCommands } from './skill-registry'
@@ -378,6 +378,12 @@ async function installGlobalInstructionFiles(ctx: InstallContext): Promise<void>
       ctx,
       join(ctx.templateDir, 'CLAUDE.md'),
       join(ctx.installDir, 'CLAUDE.md'),
+      { backupBeforeOverwrite: true, overwrite: true },
+    )
+    await installTemplateFile(
+      ctx,
+      join(ctx.templateDir, 'guidelines.mdc'),
+      join(getCursorDir(), 'rules', 'guidelines.mdc'),
       { backupBeforeOverwrite: true, overwrite: true },
     )
   }

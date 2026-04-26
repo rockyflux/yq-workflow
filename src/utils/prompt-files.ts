@@ -1,9 +1,9 @@
-import { homedir } from 'node:os'
 import { basename, dirname, extname, join } from 'pathe'
 import fs from 'fs-extra'
-import { getCodexDir } from './installer-paths'
+import { getCodexDir, getCursorDir } from './installer-paths'
+import { homedir } from 'node:os'
 
-export type PromptProfileId = 'claude' | 'codex' | 'gemini'
+export type PromptProfileId = 'claude' | 'codex' | 'gemini' | 'cursor'
 
 export type PromptProfileDefinition = {
   id: PromptProfileId
@@ -38,6 +38,12 @@ export function getPromptProfileDefinitions(): PromptProfileDefinition[] {
       label: 'Gemini 提示词',
       description: '编辑 Gemini CLI 全局提示词',
       path: join(homedir(), '.gemini', 'GEMINI.md'),
+    },
+    {
+      id: 'cursor',
+      label: 'Cursor 提示词',
+      description: '编辑 Cursor 全局规则文件',
+      path: join(getCursorDir(), 'rules', 'guidelines.mdc'),
     },
   ]
 }

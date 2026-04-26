@@ -34,6 +34,10 @@ type PromptWebLaunchResult =
   | { status: 'spawned' }
 
 const DEFAULT_PROFILE_ID: PromptProfileId = 'claude'
+const HOT_CLAUDE_PROMPT = {
+  label: '热门 Claude.md',
+  url: 'https://raw.githubusercontent.com/forrestchang/andrej-karpathy-skills/main/CLAUDE.md',
+} as const
 let ownedPromptWebPid: number | null = null
 let cleanupRegistered = false
 
@@ -177,6 +181,20 @@ export async function startPromptWebServer(options: PromptWebOptions = {}): Prom
         return
       }
 
+      if (requestUrl.pathname === '/api/import-hot' && req.method === 'POST') {
+        const body = await readRequestBody(req)
+        const profile = getProfileOrFallback(typeof body.profileId === 'string' ? body.profileId : null)
+        const imported = await fetchHotPromptContent(profile.id)
+        sendJson(res, {
+          ok: true,
+          profile,
+          sourceLabel: imported.label,
+          sourceUrl: imported.url,
+          content: imported.content,
+        })
+        return
+      }
+
       if (requestUrl.pathname === '/api/close' && req.method === 'POST') {
         sendJson(res, { ok: true })
         setTimeout(() => {
@@ -300,9 +318,16 @@ function getProfileOrFallback(profileId: string | null): ReturnType<typeof getPr
   return getPromptProfileDefinition((profileId as PromptProfileId) || DEFAULT_PROFILE_ID)
 }
 
+export function getHotPromptImportSource(profileId: PromptProfileId): { label: string, url: string } | null {
+  if (profileId === 'claude') {
+    return HOT_CLAUDE_PROMPT
+  }
+  return null
+}
+
 function getProfileIdFromEnv(): PromptProfileId | null {
   const profileId = process.env.YQ_PROMPT_WEB_PROFILE_ID
-  if (profileId === 'claude' || profileId === 'codex' || profileId === 'gemini') {
+  if (profileId === 'claude' || profileId === 'codex' || profileId === 'gemini' || profileId === 'cursor') {
     return profileId
   }
   return null
@@ -451,6 +476,30 @@ function sendJson(res: ServerResponse, data: unknown, status = 200): void {
   res.end(JSON.stringify(data))
 }
 
+async function fetchHotPromptContent(profileId: PromptProfileId): Promise<{ label: string, url: string, content: string }> {
+  const source = getHotPromptImportSource(profileId)
+  if (!source) {
+    throw new Error('当前提示词暂不支持导入热门模板')
+  }
+
+  const response = await fetch(source.url, {
+    signal: AbortSignal.timeout(10000),
+  })
+  if (!response.ok) {
+    throw new Error(`读取热门模板失败（${response.status}）`)
+  }
+
+  const content = await response.text()
+  if (!content.trim()) {
+    throw new Error('读取到的热门模板内容为空')
+  }
+
+  return {
+    ...source,
+    content,
+  }
+}
+
 function renderPromptAppHtml(): string {
   return `<!doctype html>
 <html lang="zh-CN">
@@ -482,13 +531,16 @@ function renderPromptAppHtml(): string {
     .meta-item code { font-family:Consolas,monospace; font-size:12px; white-space:pre-wrap; word-break:break-all; }
     .main { display:flex; flex-direction:column; overflow:hidden; }
     .main-header { padding:22px 24px 18px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; gap:16px; align-items:flex-start; flex-wrap:wrap; }
+    .title-row { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
     .title-wrap h2 { margin:0; font-size:32px; }
     .title-wrap p { margin:10px 0 0; color:var(--muted); }
     .toolbar { display:flex; gap:10px; flex-wrap:wrap; }
     .toolbar button, .history-select { height:44px; border:1px solid var(--border); background:#fff; border-radius:14px; padding:0 16px; }
     .toolbar button { cursor:pointer; font-weight:600; }
     .toolbar button.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+    .toolbar button.hidden, .title-row button.hidden { display:none; }
     .toolbar button.warn { color:var(--danger); }
+    .title-row button { height:36px; padding:0 12px; border:1px solid var(--border); background:#fff; border-radius:12px; cursor:pointer; font-size:13px; font-weight:500; }
     .history-select { min-width:260px; color:var(--text); }
     .editor-wrap { display:grid; grid-template-columns:minmax(0, 1fr) 320px; gap:0; min-height:0; flex:1; }
     .editor-panel { display:flex; flex-direction:column; min-height:0; }
@@ -519,10 +571,10 @@ function renderPromptAppHtml(): string {
       <aside class="sidebar">
         <div class="brand">
           <h1>提示词配置</h1>
-          <p>集中管理 Claude、Codex、Gemini 的全局提示词文件。每次保存都会先生成对应的备份目录，例如 <code>CLAUDE-backup</code>、<code>AGENTS-backup</code>，历史版本可以随时恢复。</p>
+          <p>集中管理 Claude、Codex、Gemini、Cursor 的全局提示词文件。每次保存都会先生成对应的备份目录，例如 <code>CLAUDE-backup</code>、<code>AGENTS-backup</code>、<code>guidelines-backup</code>，历史版本可以随时恢复。</p>
         </div>
         <div id="nav" class="nav"></div>
-        <div class="tip">右侧保存会先弹出确认，再自动把当前版本备份到对应目录，例如 <code>CLAUDE-backup</code>、<code>AGENTS-backup</code>。恢复历史时，也会先备份当前版本。</div>
+        <div class="tip">右侧保存会先弹出确认，再自动把当前版本备份到对应目录，例如 <code>CLAUDE-backup</code>、<code>AGENTS-backup</code>、<code>guidelines-backup</code>。恢复历史时，也会先备份当前版本。</div>
         <div class="meta-list">
           <div class="meta-item"><b>当前文件</b><code id="currentFilePath">-</code></div>
           <div class="meta-item"><b>最近保存</b><code id="currentModifiedAt">-</code></div>
@@ -531,7 +583,10 @@ function renderPromptAppHtml(): string {
       <main class="main">
         <div class="main-header">
           <div class="title-wrap">
-            <h2 id="title">加载中...</h2>
+            <div class="title-row">
+              <h2 id="title">加载中...</h2>
+              <button id="importHotBtn" type="button" class="hidden">导入热门 Claude.md</button>
+            </div>
             <p id="subtitle">正在读取提示词配置。</p>
           </div>
           <div class="toolbar">
@@ -582,6 +637,7 @@ function renderPromptAppHtml(): string {
     const currentFilePath = document.getElementById('currentFilePath');
     const currentModifiedAt = document.getElementById('currentModifiedAt');
     const historySelect = document.getElementById('historySelect');
+    const importHotBtn = document.getElementById('importHotBtn');
     const restoreBtn = document.getElementById('restoreBtn');
     const reloadBtn = document.getElementById('reloadBtn');
     const closeBtn = document.getElementById('closeBtn');
@@ -610,6 +666,7 @@ function renderPromptAppHtml(): string {
         syncStatus('内容已修改，尚未保存。');
       });
       saveBtn.addEventListener('click', saveDocument);
+      importHotBtn.addEventListener('click', importHotPrompt);
       reloadBtn.addEventListener('click', async () => {
         await loadDocument(state.currentProfileId, true);
       });
@@ -674,15 +731,23 @@ function renderPromptAppHtml(): string {
     }
 
     function renderDocument(profile, document) {
-      title.textContent = document.name;
-      subtitle.textContent = profile.description;
+      title.textContent = profile.description;
+      subtitle.textContent = document.name + ' · ' + document.path;
       currentFilePath.textContent = document.path;
       currentModifiedAt.textContent = document.modifiedAt ? formatDateTime(document.modifiedAt) : '尚未创建';
       fileNameBadge.textContent = '文件：' + document.name;
       sizeBadge.textContent = '大小：' + formatFileSize(document.size);
       backupBadge.textContent = '备份：' + document.backups.length + ' 个';
       editor.value = document.content || '';
+      syncImportButton(profile.id);
       renderHistory(document.backups || []);
+    }
+
+    function syncImportButton(profileId) {
+      const isClaude = profileId === 'claude';
+      importHotBtn.disabled = !isClaude;
+      importHotBtn.classList.toggle('hidden', !isClaude);
+      importHotBtn.title = isClaude ? '从热门 Claude.md 模板导入内容到编辑器' : '';
     }
 
     function renderHistory(backups) {
@@ -738,6 +803,39 @@ function renderPromptAppHtml(): string {
       }
       catch (error) {
         syncStatus(error instanceof Error ? error.message : '保存失败');
+      }
+      finally {
+        setToolbarDisabled(false);
+      }
+    }
+
+    async function importHotPrompt() {
+      if (state.loading) return;
+      if (state.currentProfileId !== 'claude') {
+        window.alert('当前只有 Claude 提示词支持导入热门模板。');
+        return;
+      }
+
+      if ((state.dirty || editor.value.trim()) && !window.confirm('导入会覆盖编辑器中的当前内容，但不会自动保存到磁盘，确认继续吗？')) {
+        return;
+      }
+
+      setToolbarDisabled(true);
+      syncStatus('正在导入热门 Claude.md...');
+      try {
+        const payload = await fetchJson('/api/import-hot', {
+          method: 'POST',
+          body: JSON.stringify({
+            profileId: state.currentProfileId,
+          }),
+        });
+        editor.value = payload.content || '';
+        state.dirty = true;
+        editor.focus();
+        syncStatus('已导入 ' + payload.sourceLabel + '，请确认内容后再保存。');
+      }
+      catch (error) {
+        syncStatus(error instanceof Error ? error.message : '导入失败');
       }
       finally {
         setToolbarDisabled(false);
@@ -804,6 +902,7 @@ function renderPromptAppHtml(): string {
 
     function setToolbarDisabled(disabled) {
       saveBtn.disabled = disabled;
+      importHotBtn.disabled = disabled || state.currentProfileId !== 'claude';
       reloadBtn.disabled = disabled;
       restoreBtn.disabled = disabled;
       historySelect.disabled = disabled;

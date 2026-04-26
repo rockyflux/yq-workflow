@@ -50,6 +50,7 @@ export type {
 export {
   getAgentSkillsDir,
   getCodexDir,
+  getCursorDir,
   listAgentSkillDirectories,
 } from './installer-paths'
 export type { AgentSkillDirectory } from './installer-paths'
