@@ -6,6 +6,7 @@ import ansis from 'ansis'
 import fs from 'fs-extra'
 import { getCcgDir } from '../utils/config'
 import type { McpClientId, McpServerConfig } from '../utils/mcp'
+import { getSpawnCommand } from '../utils/platform'
 import {
   backupMcpClientConfig,
   getMcpClientDefinition,
@@ -14,6 +15,12 @@ import {
   removeMcpServerFromClient,
   upsertMcpServer,
 } from '../utils/mcp'
+import {
+  addSmitheryServer,
+  getSmitheryCliStatus,
+  installSmitheryCliGlobal,
+  searchSmitheryServers,
+} from '../utils/smithery'
 
 type McpWebOptions = {
   openBrowser?: boolean
@@ -46,6 +53,8 @@ type McpPreset = {
 }
 
 const DEFAULT_CLIENT_ID: McpClientId = 'claude'
+const SMITHERY_SERVERS_URL = 'https://smithery.ai/servers'
+const SMITHERY_QUICK_TERMS = ['brave', 'context7', 'playwright', 'filesystem', 'memory', 'postgres', 'github', 'fetch']
 const PRESETS: McpPreset[] = [
   { id: 'context7', name: 'Context7', category: '必装工具', description: '获取最新库文档', template: { type: 'stdio', command: 'npx', args: ['-y', '@upstash/context7-mcp@latest'] } },
   { id: 'playwright', name: 'Playwright', category: '必装工具', description: '浏览器自动化 / 测试', template: { type: 'stdio', command: 'npx', args: ['-y', '@playwright/mcp@latest'] } },
@@ -74,9 +83,10 @@ export async function launchMcpWebDetached(clientId: McpClientId = DEFAULT_CLIEN
   }
 
   const isTypeScriptEntry = scriptPath.endsWith('.ts')
-  const command = isTypeScriptEntry ? getPnpmCommand() : process.execPath
-  const args = isTypeScriptEntry ? ['exec', 'tsx', 'src/cli.ts', 'config', 'mcp-web'] : [scriptPath, 'config', 'mcp-web']
-  const child = spawn(command, args, {
+  const launchCommand = isTypeScriptEntry
+    ? getSpawnCommand('pnpm', ['exec', 'tsx', 'src/cli.ts', 'config', 'mcp-web'])
+    : { command: process.execPath, args: [scriptPath, 'config', 'mcp-web'] }
+  const child = spawn(launchCommand.command, launchCommand.args, {
     cwd: process.cwd(),
     detached: true,
     stdio: 'ignore',
@@ -109,6 +119,7 @@ export async function startMcpWebServer(options: McpWebOptions = {}): Promise<vo
           clients: getMcpClientDefinitions(),
           defaultClientId: resolvedClientId,
           presets: PRESETS,
+          smitheryQuickTerms: SMITHERY_QUICK_TERMS,
         })
         return
       }
@@ -150,6 +161,31 @@ export async function startMcpWebServer(options: McpWebOptions = {}): Promise<vo
         await backupMcpClientConfig(clientId)
         await deleteServer(clientId, serverId)
         sendJson(res, { ok: true })
+        return
+      }
+
+      if (requestUrl.pathname === '/api/smithery/status') {
+        sendJson(res, {
+          catalogUrl: SMITHERY_SERVERS_URL,
+          status: await getSmitheryCliStatus(),
+        })
+        return
+      }
+
+      if (requestUrl.pathname === '/api/smithery/install' && req.method === 'POST') {
+        const status = await installSmitheryCliGlobal()
+        sendJson(res, {
+          ok: true,
+          status,
+        })
+        return
+      }
+
+      if (requestUrl.pathname === '/api/smithery/search') {
+        const query = String(requestUrl.searchParams.get('query') || '').trim()
+        sendJson(res, {
+          servers: await searchSmitheryServers(query),
+        })
         return
       }
 
@@ -352,10 +388,6 @@ async function readJsonBody(req: IncomingMessage): Promise<Record<string, unknow
   return chunks.length ? JSON.parse(Buffer.concat(chunks).toString('utf-8')) as Record<string, unknown> : {}
 }
 
-function getPnpmCommand(): string {
-  return process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'
-}
-
 function registerOwnedMcpWebProcess(pid: number | undefined): void {
   if (!pid) return
   ownedMcpWebPid = pid
@@ -417,6 +449,7 @@ function renderMcpAppHtml(): string {
   .tab:hover{background:rgba(37,99,235,.06);color:var(--text)}.tab.active{background:#fff;color:var(--text);box-shadow:0 4px 18px rgba(15,23,42,.08)}
   .tab-badge{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:999px;background:#eff3f8;color:var(--muted-2);font-size:12px;font-weight:700}
   .workspace{margin-top:16px;border:1px solid rgba(15,23,42,.08);background:rgba(255,255,255,.94);border-radius:28px;box-shadow:var(--shadow);overflow:hidden}
+  .workspace + .workspace{margin-top:18px}
   .toolbar{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;padding:22px 24px 18px;border-bottom:1px solid rgba(15,23,42,.06)}
   .title-stack{display:grid;gap:10px;min-width:0}.client-line{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
   .client-name{font-size:28px;font-weight:700}.meta-line{display:flex;gap:10px;flex-wrap:wrap}
@@ -448,6 +481,25 @@ function renderMcpAppHtml(): string {
   .slider::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(15,23,42,.22);transition:.2s ease}
   .switch input:checked + .slider{background:var(--accent)}.switch input:checked + .slider::after{transform:translateX(18px)}
   .empty{padding:42px 16px;color:var(--muted);text-align:center;border:1px dashed rgba(15,23,42,.14);border-radius:22px;background:#fbfcfe}
+  .section-copy{padding:0 24px 18px;color:var(--muted-2);font-size:14px;line-height:1.6}
+  .smithery-layout{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;padding:0 24px 24px}
+  .smithery-results{display:grid;gap:12px}
+  .smithery-grid{display:grid;gap:12px}
+  .smithery-card{display:grid;gap:10px;padding:16px;border:1px solid rgba(15,23,42,.08);border-radius:20px;background:linear-gradient(180deg,#fff,#fbfcfe)}
+  .smithery-card-top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+  .smithery-head{display:flex;align-items:flex-start;gap:8px;min-width:0}
+  .icon-btn{display:inline-flex;align-items:center;justify-content:center;width:32px;min-width:32px;height:32px;padding:0;border:1px solid var(--line);border-radius:999px;background:#fff;color:var(--muted-2);cursor:pointer;transition:.18s ease}
+  .icon-btn:hover{border-color:#bfdbfe;background:#f8fbff;color:var(--text);transform:translateY(-1px)}
+  .smithery-name{font-size:18px;font-weight:700;line-height:1.3}
+  .smithery-sub{color:var(--muted);font-size:13px;word-break:break-all}
+  .smithery-desc{color:var(--muted-2);font-size:14px;line-height:1.6}
+  .smithery-meta{display:flex;gap:8px;flex-wrap:wrap}
+  .status-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .status-text{color:var(--muted-2);font-size:14px}
+  .textarea-sm{min-height:140px}
+  .quick-row{display:flex;gap:8px;flex-wrap:wrap;padding:10px 24px 16px}
+  .quick-chip{display:inline-flex;align-items:center;height:32px;padding:0 12px;border:1px solid var(--line);border-radius:999px;background:#fff;color:var(--muted-2);font-size:13px;cursor:pointer;transition:.18s ease}
+  .quick-chip:hover{border-color:#bfdbfe;background:#f8fbff;color:var(--text)}
   .overlay{position:fixed;inset:0;background:rgba(15,23,42,.42);display:none;align-items:center;justify-content:center;padding:18px}
   .overlay.open{display:flex}
   .modal{width:min(1040px,100%);max-height:94vh;overflow:auto;background:#fff;border-radius:28px;box-shadow:0 24px 72px rgba(15,23,42,.18)}
@@ -465,14 +517,16 @@ function renderMcpAppHtml(): string {
   .helper{font-size:13px;color:var(--muted);line-height:1.6}
   .footer{display:flex;justify-content:flex-end;gap:10px;margin-top:20px}
   .mono{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
-  @media (max-width:960px){.hero{flex-direction:column}.toolbar,.controls,.card,.form-grid{grid-template-columns:1fr;display:grid}.toolbar-actions,.hintbar,.ops-row{justify-content:flex-start}.ops{align-items:flex-start}.preset-grid{grid-template-columns:1fr}.hero h1{font-size:30px}}
-  </style></head><body><div class="page"><header class="hero"><div><h1>服务器 · 多引擎独立管理</h1><p>把 Claude、Codex、Gemini 的 MCP 放在一个页面里统一维护。编辑时保留模板与 JSON 直编。</p></div><div class="hero-actions"><button class="btn" id="closeBtn">关闭服务</button></div></header><div class="segmented" id="tabs"></div><section class="workspace"><div class="toolbar"><div class="title-stack"><div class="client-line"><div class="client-name" id="clientName"></div><span class="pill blue" id="activeCount">已启用 0</span><span class="pill" id="totalCount">共 0 个</span></div><div class="path" id="clientPath"></div></div><div class="toolbar-actions"><button class="btn" id="refreshBtn">刷新</button><button class="btn primary" id="addBtn">添加工具</button></div></div><div class="controls"><input id="searchInput" class="search" type="search" placeholder="搜索服务名、命令、URL 或参数"><div class="hintbar"><span class="pill">支持启用 / 停用</span><span class="pill">保存前自动备份</span><span class="pill">JSON 直编</span></div></div><div class="status" id="status">正在加载...</div><div class="grid" id="list"></div></section></div><div class="overlay" id="overlay"><div class="modal"><div class="modal-head"><div><h2 id="modalTitle">添加 MCP 服务</h2><p id="modalSub">选择模板后可直接微调 JSON；保存前会先备份目标配置文件。</p></div><button class="btn" id="cancelXBtn">关闭</button></div><div class="modal-body"><div class="form-grid"><div class="stack"><div class="field"><label>服务器 ID</label><input id="serverId" placeholder="my-mcp-server"><div class="helper">作为唯一标识使用，编辑已有服务时保持只读。</div></div><div class="field"><label>服务器配置 JSON</label><textarea id="configJson"></textarea><div class="helper">支持 <span class="mono">stdio</span> / <span class="mono">sse</span>。列表页会自动展示命令摘要、环境变量数量与 URL。</div></div></div><aside class="stack"><div class="panel-soft"><div class="field"><label>快速模板</label><div class="preset-groups" id="presetGrid"></div></div><div class="helper">仍然保留四类 MCP 预置：必装工具、数据库操作、Git / 版本控制、文件 / 资源操作。</div></div></aside></div><div class="footer"><button class="btn" id="cancelBtn">取消</button><button class="btn primary" id="saveBtn">保存</button></div></div></div></div><script>
-  const state={clients:[],clientId:null,servers:[],editingId:null,presets:[],search:''};const tabs=document.getElementById('tabs');const list=document.getElementById('list');const clientName=document.getElementById('clientName');const clientPath=document.getElementById('clientPath');const statusEl=document.getElementById('status');const overlay=document.getElementById('overlay');const serverIdInput=document.getElementById('serverId');const configJson=document.getElementById('configJson');const modalTitle=document.getElementById('modalTitle');const modalSub=document.getElementById('modalSub');const presetGrid=document.getElementById('presetGrid');const activeCount=document.getElementById('activeCount');const totalCount=document.getElementById('totalCount');const searchInput=document.getElementById('searchInput');
-  document.getElementById('refreshBtn').onclick=()=>loadServers();document.getElementById('addBtn').onclick=()=>openModal();document.getElementById('cancelBtn').onclick=closeModal;document.getElementById('cancelXBtn').onclick=closeModal;document.getElementById('saveBtn').onclick=saveServer;document.getElementById('closeBtn').onclick=closeService;searchInput.oninput=event=>{state.search=String(event.target.value||'').trim().toLowerCase();renderList();};
+  @media (max-width:960px){.hero{flex-direction:column}.toolbar,.controls,.card,.form-grid,.smithery-layout{grid-template-columns:1fr;display:grid}.toolbar-actions,.hintbar,.ops-row{justify-content:flex-start}.ops{align-items:flex-start}.preset-grid{grid-template-columns:1fr}.hero h1{font-size:30px}}
+  </style></head><body><div class="page"><header class="hero"><div><h1>服务器 · 多引擎独立管理</h1><p>把 Claude、Codex、Gemini 的 MCP 放在一个页面里统一维护。编辑时保留模板与 JSON 直编，也支持从 Smithery 服务器库检索并跳转到对应详情页。</p></div><div class="hero-actions"><button class="btn" id="closeBtn">关闭服务</button></div></header><div class="segmented" id="tabs"></div><section class="workspace"><div class="toolbar"><div class="title-stack"><div class="client-line"><div class="client-name" id="clientName"></div><span class="pill blue" id="activeCount">已启用 0</span><span class="pill" id="totalCount">共 0 个</span></div><div class="path" id="clientPath"></div></div><div class="toolbar-actions"><button class="btn" id="refreshBtn">刷新</button><button class="btn primary" id="addBtn">添加工具</button></div></div><div class="controls"><input id="searchInput" class="search" type="search" placeholder="搜索服务名、命令、URL 或参数"><div class="hintbar"><span class="pill">支持启用 / 停用</span><span class="pill">保存前自动备份</span><span class="pill">JSON 直编</span></div></div><div class="status" id="status">正在加载...</div><div class="grid" id="list"></div></section><section class="workspace"><div class="toolbar"><div class="title-stack"><div class="client-line"><div class="client-name">Smithery 服务器库</div><span class="pill" id="smitheryVersionPill">CLI 未检测</span></div><div class="path">支持执行 <span class="mono">npm install -g @smithery/cli@latest</span>，也支持直接用 <span class="mono">npx -y @smithery/cli@latest</span> 搜索服务器后打开对应详情页。</div></div><div class="toolbar-actions"><button class="btn" id="smitheryOpenBtn">打开官网</button><button class="btn" id="smitheryInstallBtn">安装 / 更新 CLI</button><button class="btn" id="smitheryReloadBtn">刷新状态</button></div></div><div class="section-copy"><div class="status-row"><span class="status-text" id="smitheryStatusText">正在检测 Smithery CLI...</span></div></div><div class="controls"><input id="smitherySearchInput" class="search" type="search" placeholder="搜索 Smithery 服务器，例如 brave、context7、filesystem"><div class="hintbar"><button class="btn" id="smitherySearchBtn">搜索</button><span class="pill">搜索来自 smithery mcp search</span><span class="pill">结果可直接打开对应详情页</span></div></div><div class="quick-row" id="smitheryQuickRow"></div><div class="smithery-layout"><div class="smithery-results"><div class="status" id="smitherySearchStatus">输入关键字后开始搜索</div><div class="smithery-grid" id="smitheryResults"></div></div></div></section></div><div class="overlay" id="overlay"><div class="modal"><div class="modal-head"><div><h2 id="modalTitle">添加 MCP 服务</h2><p id="modalSub">选择模板后可直接微调 JSON；保存前会先备份目标配置文件。</p></div><button class="btn" id="cancelXBtn">关闭</button></div><div class="modal-body"><div class="form-grid"><div class="stack"><div class="field"><label>服务器 ID</label><input id="serverId" placeholder="my-mcp-server"><div class="helper">作为唯一标识使用，编辑已有服务时保持只读。</div></div><div class="field"><label>服务器配置 JSON</label><textarea id="configJson"></textarea><div class="helper">支持 <span class="mono">stdio</span> / <span class="mono">sse</span>。列表页会自动展示命令摘要、环境变量数量与 URL。</div></div></div><aside class="stack"><div class="panel-soft"><div class="field"><label>快速模板</label><div class="preset-groups" id="presetGrid"></div></div><div class="helper">仍然保留四类 MCP 预置：必装工具、数据库操作、Git / 版本控制、文件 / 资源操作。</div></div></aside></div><div class="footer"><button class="btn" id="cancelBtn">取消</button><button class="btn primary" id="saveBtn">保存</button></div></div></div></div><script>
+  const state={clients:[],clientId:null,servers:[],editingId:null,presets:[],search:'',smithery:{status:null,results:[],query:'',quickTerms:[]}};const tabs=document.getElementById('tabs');const list=document.getElementById('list');const clientName=document.getElementById('clientName');const clientPath=document.getElementById('clientPath');const statusEl=document.getElementById('status');const overlay=document.getElementById('overlay');const serverIdInput=document.getElementById('serverId');const configJson=document.getElementById('configJson');const modalTitle=document.getElementById('modalTitle');const modalSub=document.getElementById('modalSub');const presetGrid=document.getElementById('presetGrid');const activeCount=document.getElementById('activeCount');const totalCount=document.getElementById('totalCount');const searchInput=document.getElementById('searchInput');const smitheryVersionPill=document.getElementById('smitheryVersionPill');const smitheryStatusText=document.getElementById('smitheryStatusText');const smitherySearchInput=document.getElementById('smitherySearchInput');const smitherySearchStatus=document.getElementById('smitherySearchStatus');const smitheryResults=document.getElementById('smitheryResults');const smitheryQuickRow=document.getElementById('smitheryQuickRow');
+  document.getElementById('refreshBtn').onclick=()=>loadServers();document.getElementById('addBtn').onclick=()=>openModal();document.getElementById('cancelBtn').onclick=closeModal;document.getElementById('cancelXBtn').onclick=closeModal;document.getElementById('saveBtn').onclick=saveServer;document.getElementById('closeBtn').onclick=closeService;document.getElementById('smitheryReloadBtn').onclick=()=>loadSmitheryStatus();document.getElementById('smitheryInstallBtn').onclick=()=>installSmitheryCli();document.getElementById('smitheryOpenBtn').onclick=()=>window.open('https://smithery.ai/servers','_blank','noopener');document.getElementById('smitherySearchBtn').onclick=()=>searchSmithery();searchInput.oninput=event=>{state.search=String(event.target.value||'').trim().toLowerCase();renderList();};smitherySearchInput.onkeydown=event=>{if(event.key==='Enter'){event.preventDefault();searchSmithery();}};
   init();
-  async function init(){const boot=await fetchJson('/api/bootstrap');state.clients=boot.clients;state.presets=boot.presets;state.clientId=boot.defaultClientId;renderTabs();renderPresets();await loadServers();}
+  async function init(){const boot=await fetchJson('/api/bootstrap');state.clients=boot.clients;state.presets=boot.presets;state.clientId=boot.defaultClientId;state.smithery.quickTerms=Array.isArray(boot.smitheryQuickTerms)?boot.smitheryQuickTerms:[];renderTabs();renderPresets();renderSmitheryQuickTerms();await Promise.all([loadServers(),loadSmitheryStatus()]);}
   function renderTabs(){tabs.innerHTML=state.clients.map(client=>'<button class="tab'+(client.id===state.clientId?' active':'')+'" data-client="'+escapeAttr(client.id)+'"><span class="tab-badge">'+escapeHtml(client.label.slice(0,1))+'</span><span>'+escapeHtml(client.label)+'</span></button>').join('');tabs.querySelectorAll('[data-client]').forEach(el=>el.onclick=async()=>{state.clientId=el.getAttribute('data-client');renderTabs();await loadServers();});}
   function renderPresets(){const groups={};state.presets.forEach(item=>{(groups[item.category]||(groups[item.category]=[])).push(item);});presetGrid.innerHTML=Object.entries(groups).map(([category,items])=>'<section class="preset-group"><div class="preset-title">'+escapeHtml(category)+'</div><div class="preset-grid">'+items.map(item=>'<button type="button" class="preset" data-preset="'+escapeAttr(item.id)+'"><strong>'+escapeHtml(item.name)+'</strong><span>'+escapeHtml(item.description)+'</span></button>').join('')+'</div></section>').join('');presetGrid.querySelectorAll('[data-preset]').forEach(el=>el.onclick=()=>applyPreset(el.getAttribute('data-preset')));}
+  function renderSmitheryQuickTerms(){if(!state.smithery.quickTerms.length){smitheryQuickRow.innerHTML='';return;}smitheryQuickRow.innerHTML=state.smithery.quickTerms.map(term=>'<button type="button" class="quick-chip" data-term="'+escapeAttr(term)+'">'+escapeHtml(term)+'</button>').join('');smitheryQuickRow.querySelectorAll('[data-term]').forEach(el=>el.onclick=()=>triggerSmitheryQuickSearch(el.getAttribute('data-term')));}
+  function triggerSmitheryQuickSearch(term){if(!term)return;smitherySearchInput.value=term;state.smithery.query=term;searchSmithery();}
   function applyPreset(presetId){const preset=state.presets.find(item=>item.id===presetId);if(!preset)return;if(!state.editingId)serverIdInput.value=preset.id;configJson.value=JSON.stringify(preset.template,null,2);}
   async function loadServers(){statusEl.textContent='正在读取 '+state.clientId+' 配置...';const payload=await fetchJson('/api/servers?client='+encodeURIComponent(state.clientId));state.servers=payload.servers;clientName.textContent=payload.client.label;clientPath.textContent=payload.client.configPath;searchInput.value='';state.search='';renderList();updateSummary();statusEl.textContent='配置已同步';}
   function updateSummary(){const enabledCount=state.servers.filter(item=>item.enabled).length;activeCount.textContent='已启用 '+enabledCount;totalCount.textContent='共 '+state.servers.length+' 个';}
@@ -487,6 +541,12 @@ function renderMcpAppHtml(): string {
   async function saveServer(){try{const payload={clientId:state.clientId,serverId:serverIdInput.value.trim(),config:JSON.parse(configJson.value),enabled:true};await fetchJson('/api/server',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});closeModal();await loadServers();statusEl.textContent='保存完成';}catch(error){window.alert(error instanceof Error?error.message:'保存失败');}}
   async function toggleServer(serverId,enabled){try{await fetchJson('/api/toggle',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({clientId:state.clientId,serverId,enabled})});await loadServers();}catch(error){window.alert(error instanceof Error?error.message:'切换失败');await loadServers();}}
   async function removeServer(serverId){if(!window.confirm('确认删除 '+serverId+' 吗？'))return;try{await fetchJson('/api/server?client='+encodeURIComponent(state.clientId)+'&id='+encodeURIComponent(serverId),{method:'DELETE'});await loadServers();statusEl.textContent='已删除 '+serverId;}catch(error){window.alert(error instanceof Error?error.message:'删除失败');}}
+  async function loadSmitheryStatus(){smitheryStatusText.textContent='正在检测 Smithery CLI...';try{const payload=await fetchJson('/api/smithery/status');state.smithery.status=payload.status;smitheryVersionPill.textContent=payload.status.installed&&payload.status.version?'CLI v'+payload.status.version:'CLI 未安装';smitheryVersionPill.className='pill'+(payload.status.installed?' ok':'');smitheryStatusText.textContent=payload.status.installed?'已检测到全局 Smithery CLI，可直接在命令行使用 smithery。':'尚未检测到全局 Smithery CLI；页面仍可直接通过 npx 搜索和添加。';}catch(error){smitheryVersionPill.textContent='CLI 检测失败';smitheryVersionPill.className='pill';smitheryStatusText.textContent=error instanceof Error?error.message:'Smithery 状态检测失败';}}
+  async function installSmitheryCli(){const confirmed=window.confirm('将执行 npm install -g @smithery/cli@latest，是否继续？');if(!confirmed)return;smitheryStatusText.textContent='正在安装 / 更新 Smithery CLI，请稍候...';try{const payload=await fetchJson('/api/smithery/install',{method:'POST'});state.smithery.status=payload.status;smitheryVersionPill.textContent=payload.status.installed&&payload.status.version?'CLI v'+payload.status.version:payload.status.installed?'CLI 已安装':'CLI 未安装';smitheryVersionPill.className='pill'+(payload.status.installed?' ok':'');smitheryStatusText.textContent=payload.status.installed?'Smithery CLI 已安装，可直接使用 smithery --help 或下方搜索。':'Smithery CLI 安装命令已执行，但当前仍未检测到 smithery，请检查 PATH 或重新打开终端。';}catch(error){smitheryStatusText.textContent=error instanceof Error?error.message:'Smithery CLI 安装失败';window.alert(error instanceof Error?error.message:'Smithery CLI 安装失败');}}
+  async function searchSmithery(){const query=String(smitherySearchInput.value||'').trim();state.smithery.query=query;if(!query){state.smithery.results=[];renderSmitheryResults();smitherySearchStatus.textContent='输入关键字后开始搜索';return;}smitherySearchStatus.textContent='正在通过 smithery mcp search 检索...';try{const payload=await fetchJson('/api/smithery/search?query='+encodeURIComponent(query));state.smithery.results=Array.isArray(payload.servers)?payload.servers:[];renderSmitheryResults();smitherySearchStatus.textContent=state.smithery.results.length?'共找到 '+state.smithery.results.length+' 个结果':'未找到匹配结果';}catch(error){state.smithery.results=[];renderSmitheryResults();smitherySearchStatus.textContent=error instanceof Error?error.message:'Smithery 搜索失败';window.alert(error instanceof Error?error.message:'Smithery 搜索失败');}}
+  function renderSmitheryResults(){if(!state.smithery.results.length){smitheryResults.innerHTML='<div class="empty">'+(state.smithery.query?'没有匹配的 Smithery 服务器。':'输入关键字后会在这里显示搜索结果。')+'</div>';return;}smitheryResults.innerHTML=state.smithery.results.map(item=>'<article class="smithery-card"><div class="smithery-card-top"><div class="smithery-head"><div><div class="smithery-name">'+escapeHtml(item.name||item.qualifiedName)+'</div><div class="smithery-sub">'+escapeHtml(item.qualifiedName)+'</div></div><button class="icon-btn" data-open-detail="'+escapeAttr(item.qualifiedName||'')+'" title="打开 Smithery 详情页" aria-label="打开 Smithery 详情页">↗</button></div><div class="smithery-meta"><span class="pill">use '+escapeHtml(String(item.useCount||0))+'</span></div></div><div class="smithery-desc">'+escapeHtml(item.description||'无描述')+'</div><div class="smithery-sub">'+escapeHtml(item.connectionUrl)+'</div></article>').join('');smitheryResults.querySelectorAll('[data-open-detail]').forEach(el=>el.onclick=()=>openSmitheryDetail(el.getAttribute('data-open-detail')));}
+  function openSmitheryDetail(qualifiedName){if(!qualifiedName)return;openExternalUrl('https://smithery.ai/servers/'+qualifiedName);}
+  function openExternalUrl(url){if(!url)return;window.open(url,'_blank','noopener');}
   async function closeService(){if(!window.confirm('确认关闭本地 MCP 配置页服务？'))return;await fetch('/api/close',{method:'POST'});document.body.innerHTML='<div style="display:flex;min-height:100vh;align-items:center;justify-content:center;font:16px/1.6 Segoe UI,system-ui,sans-serif;color:#475467;background:#f5f7fb;">本地 MCP 配置页已关闭，现在可以关闭这个页面了。</div>';setTimeout(()=>window.close(),300);}
   async function fetchJson(url,options){const response=await fetch(url,options);const payload=await response.json();if(!response.ok)throw new Error(payload.error||'请求失败');return payload;}
   function escapeHtml(value){return String(value).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;');}

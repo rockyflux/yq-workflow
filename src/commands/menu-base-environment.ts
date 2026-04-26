@@ -42,7 +42,7 @@ function printBaseEnvironmentStatusLines(statuses: BaseEnvironmentToolStatus[]):
 
   console.log()
   console.log(ansis.cyan.bold('  基础环境检测'))
-  console.log(ansis.gray('  检测 Git、PowerShell、Node.js、Python、pnpm、uv、VS Code，并提供安装入口'))
+  console.log(ansis.gray('  检测 Git、PowerShell、Node.js、Python、pip、pnpm、uv、VS Code，并提供安装入口'))
   console.log(ansis.gray('  菜单额外提供“科学上网”快捷入口，可直接打开相关文章'))
   console.log()
   console.log(ansis.gray(separator))

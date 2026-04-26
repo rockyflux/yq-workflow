@@ -152,7 +152,10 @@ async function uninstall(): Promise<boolean> {
 
 export async function showMainMenu(): Promise<void> {
   while (true) {
-    await renderMenuStatus(HEADER_INNER_WIDTH, MENU_RESOURCES)
+    const installStatus = await renderMenuStatus(HEADER_INNER_WIDTH, MENU_RESOURCES)
+    const updateMenuChoice = installStatus.isCurrentNewer
+      ? `${ansis.yellow('2. 更新工作流')}  ${ansis.yellowBright('-  更新到最新版本')} ${ansis.bgYellow.black(' 有版本更新 ')}`
+      : formatMenuChoice('2. 更新工作流', '- 更新到最新版本')
 
     const { action } = await promptMenuList([{
       type: 'list',
@@ -162,14 +165,14 @@ export async function showMainMenu(): Promise<void> {
       choices: [
         new inquirer.Separator(`${MENU_SEPARATOR} 核心工作流 ${MENU_SEPARATOR}`),
         { name: formatMenuChoice('1. 初始化 / 重装工作流', '- 安装 YQ 工作流'), value: 'init' },
-        { name: formatMenuChoice('2. 更新工作流', '- 更新到最新版本'), value: 'update' },
+        { name: updateMenuChoice, value: 'update' },
         { name: formatMenuChoice('3. 热门开源工作流', '- GET SHIT DONE / gstack / Trellis'), value: 'popular-workflows' },
         { name: formatMenuChoice('4. 提示词配置', '- Claude / Codex / Gemini 提示词编辑器'), value: 'prompts' },
         { name: formatMenuChoice('5. 配置 Skills', '- Skills.sh + 本地 Skills 目录'), value: 'skills' },
         { name: formatMenuChoice('6. 配置 MCP', '- Claude / Codex / Gemini 本地网页管理'), value: 'mcp' },
         new inquirer.Separator(`${MENU_SEPARATOR} 编程工具 ${MENU_SEPARATOR}`),
         { name: formatMenuChoice('T. Claude Code 工具', '- Claude Code, ccusage, CCR, CCometixLine'), value: 'tools' },
-        { name: formatMenuChoice('E. 基础环境检测', '- Git, PowerShell, Node.js, Python, pnpm, uv, VS Code'), value: 'environment' },
+        { name: formatMenuChoice('E. 基础环境检测', '- Git, PowerShell, Node.js, Python, pip, pnpm, uv, VS Code'), value: 'environment' },
         { name: formatMenuChoice('C. 安装编程工具', '- CLI 命令行版 / 桌面端 UI'), value: 'coding-tools' },
         { name: formatMenuChoice('I. 模型账号管理', '- 客户端 / 续杯工具'), value: 'ai-accounts' },
         { name: formatMenuChoice('U. 模型使用统计', '- Claude Code / Codex / 网页版统计工具'), value: 'model-usage' },

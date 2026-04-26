@@ -49,6 +49,19 @@ export function getMcpCommand(command: string): string[] {
   return [command]
 }
 
+export function getSpawnCommand(command: string, args: string[] = []): { command: string, args: string[] } {
+  const needsWrapping = ['npx', 'uvx', 'node', 'npm', 'pnpm', 'yarn', 'smithery']
+
+  if (isWindows() && needsWrapping.includes(command)) {
+    return {
+      command: 'cmd',
+      args: ['/d', '/s', '/c', command, ...args],
+    }
+  }
+
+  return { command, args }
+}
+
 /**
  * Get current platform name
  */

@@ -1,6 +1,6 @@
 {
   "name": "yq-workflow",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "YQ AI coding toolkit for workflows, prompts, skills, MCP, and coding tool setup",
   "type": "module",
   "packageManager": "pnpm@10.17.1",

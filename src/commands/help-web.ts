@@ -10,6 +10,7 @@ import { SKILLS_SH_URL } from './menu-constants'
 import { getCcgDir } from '../utils/config'
 import type { HelpRootId } from '../utils/help-web'
 import { buildHelpTree, getHelpRootDefinition, getHelpRootDefinitions, resolveHelpFilePath } from '../utils/help-web'
+import { getSpawnCommand } from '../utils/platform'
 
 type HelpWebOptions = {
   openBrowser?: boolean
@@ -57,12 +58,11 @@ export async function launchHelpWebDetached(rootId: HelpRootId = DEFAULT_ROOT_ID
   }
 
   const isTypeScriptEntry = scriptPath.endsWith('.ts')
-  const command = isTypeScriptEntry ? getPnpmCommand() : process.execPath
-  const args = isTypeScriptEntry
-    ? ['exec', 'tsx', 'src/cli.ts', 'config', 'skills-web']
-    : [scriptPath, 'config', 'skills-web']
+  const launchCommand = isTypeScriptEntry
+    ? getSpawnCommand('pnpm', ['exec', 'tsx', 'src/cli.ts', 'config', 'skills-web'])
+    : { command: process.execPath, args: [scriptPath, 'config', 'skills-web'] }
 
-  const child = spawn(command, args, {
+  const child = spawn(launchCommand.command, launchCommand.args, {
     cwd: process.cwd(),
     detached: true,
     stdio: 'ignore',
@@ -335,10 +335,6 @@ function getOwnerPidFromEnv(): number | null {
   }
 
   return ownerPid
-}
-
-function getPnpmCommand(): string {
-  return process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'
 }
 
 function registerOwnedHelpWebProcess(pid: number | undefined): void {

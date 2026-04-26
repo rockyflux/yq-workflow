@@ -3,9 +3,23 @@ import ansis from 'ansis'
 import inquirer from 'inquirer'
 import { homedir } from 'node:os'
 import { join } from 'pathe'
+import { version as packageVersion } from '../../package.json'
 import { i18n, initI18n } from '../i18n'
 import { createDefaultConfig, readCcgConfig, writeCcgConfig } from '../utils/config'
 import { getAgentSkillsDir, getAllCommandIds, installWorkflows, showInstallSummary } from '../utils/installer'
+import { compareVersions } from '../utils/version'
+
+function getInitConfirmMessage(installedVersion: string | null, currentVersion: string): string {
+  if (!installedVersion) {
+    return '确认开始安装？'
+  }
+
+  if (compareVersions(currentVersion, installedVersion) === 0) {
+    return `检测到已安装版本与当前启动版本一致（v${currentVersion}），是否覆盖更新？`
+  }
+
+  return `检测到已安装版本为 v${installedVersion}，当前启动版本为 v${currentVersion}，是否更新？`
+}
 
 export async function init(options: InitOptions = {}): Promise<void> {
   console.log()
@@ -30,7 +44,7 @@ export async function init(options: InitOptions = {}): Promise<void> {
       {
         type: 'confirm',
         name: 'confirmInstall',
-        message: '确认开始安装？',
+        message: getInitConfirmMessage(existingConfig?.general?.version || null, packageVersion),
         default: true,
       },
     ] as any)

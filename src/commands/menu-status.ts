@@ -14,6 +14,7 @@ type InstallStatus = {
   installedVersion: string | null
   currentVersion: string
   needsUpdate: boolean
+  isCurrentNewer: boolean
 }
 
 type InstalledSkill = {
@@ -106,12 +107,14 @@ async function getInstallStatus(commandCount: number): Promise<InstallStatus> {
   const installedVersion = config?.general?.version || null
   const isInstalled = Boolean(installedVersion) && commandCount > 0
   const needsUpdate = installedVersion !== null && compareVersions(version, installedVersion) !== 0
+  const isCurrentNewer = installedVersion !== null && compareVersions(version, installedVersion) > 0
 
   return {
     isInstalled,
     installedVersion,
     currentVersion: version,
     needsUpdate,
+    isCurrentNewer,
   }
 }
 
@@ -132,9 +135,8 @@ function printInstallStatus(status: InstallStatus): void {
     return
   }
 
-  const isCurrentNewer = compareVersions(status.currentVersion, installedVersion) > 0
-  const reminder = isCurrentNewer
-    ? `检测到已安装版本较旧，当前启动版本为 v${status.currentVersion}，建议执行 ${ansis.cyan('yq update')}`
+  const reminder = status.isCurrentNewer
+    ? `检测到已安装版本较旧，当前启动版本为 v${status.currentVersion}，可直接在主菜单选择更新`
     : `检测到当前启动版本较旧，已安装版本为 v${installedVersion}，建议更新 CLI 或使用较新的 yq-workflow 版本`
 
   console.log(ansis.yellow(`  更新提醒: ${reminder}`))
@@ -183,7 +185,7 @@ function printMenuResources(resources: ReadonlyArray<{ label: string, url: strin
 export async function renderMenuStatus(
   innerWidth: number,
   resources: ReadonlyArray<{ label: string, url: string }>,
-): Promise<void> {
+): Promise<InstallStatus> {
   const [commandCount, skillCount] = await Promise.all([
     countInstalledCommands(),
     countInstalledSkills(),
@@ -193,4 +195,6 @@ export async function renderMenuStatus(
   drawHeader(innerWidth, commandCount, skillCount)
   printInstallStatus(installStatus)
   printMenuResources(resources)
+
+  return installStatus
 }

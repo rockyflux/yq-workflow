@@ -3,7 +3,7 @@ import { promisify } from 'node:util'
 
 const execFileAsync = promisify(execFile)
 
-export type BaseEnvironmentToolId = 'git' | 'powershell' | 'nodejs' | 'python' | 'pnpm' | 'uv' | 'vscode'
+export type BaseEnvironmentToolId = 'git' | 'powershell' | 'nodejs' | 'python' | 'pip' | 'pnpm' | 'uv' | 'vscode'
 
 export interface BaseEnvironmentInstallAction {
   id: string
@@ -318,6 +318,61 @@ function getBaseEnvironmentToolDefinitions(): BaseEnvironmentToolDefinition[] {
         ],
       },
       locateCommand: platform => platform === 'win32' ? 'python' : 'python3',
+    },
+    {
+      id: 'pip',
+      label: 'pip',
+      description: '检测 pip Python 包管理器并提供修复入口',
+      detect: platform => platform === 'win32'
+        ? [
+            { command: 'pip', args: ['--version'], label: 'pip', versionPattern: /pip (\d+(?:\.\d+)+)/i },
+            { command: 'py', args: ['-m', 'pip', '--version'], label: 'py -m pip', versionPattern: /pip (\d+(?:\.\d+)+)/i },
+            { command: 'python', args: ['-m', 'pip', '--version'], label: 'python -m pip', versionPattern: /pip (\d+(?:\.\d+)+)/i },
+          ]
+        : [
+            { command: 'pip3', args: ['--version'], label: 'pip3', versionPattern: /pip (\d+(?:\.\d+)+)/i },
+            { command: 'python3', args: ['-m', 'pip', '--version'], label: 'python3 -m pip', versionPattern: /pip (\d+(?:\.\d+)+)/i },
+            { command: 'pip', args: ['--version'], label: 'pip', versionPattern: /pip (\d+(?:\.\d+)+)/i },
+          ],
+      getDetail: (version, sourceLabel) => {
+        if (!version) return '未检测到 pip'
+        return sourceLabel ? `已检测到 ${sourceLabel} ${version}` : `已检测到 pip ${version}`
+      },
+      installActions: {
+        win32: [
+          {
+            id: 'install-ensurepip',
+            label: '使用 ensurepip 修复 / 安装 pip',
+            type: 'command',
+            command: 'py',
+            args: ['-m', 'ensurepip', '--upgrade'],
+            successText: 'pip 修复命令已执行完成',
+          },
+          {
+            id: 'open-docs',
+            label: '打开 pip 官方文档',
+            type: 'link',
+            url: 'https://pip.pypa.io/en/stable/installation/',
+          },
+        ],
+        darwin: [
+          {
+            id: 'install-ensurepip',
+            label: '使用 ensurepip 修复 / 安装 pip',
+            type: 'command',
+            command: 'python3',
+            args: ['-m', 'ensurepip', '--upgrade'],
+            successText: 'pip 修复命令已执行完成',
+          },
+          {
+            id: 'open-docs',
+            label: '打开 pip 官方文档',
+            type: 'link',
+            url: 'https://pip.pypa.io/en/stable/installation/',
+          },
+        ],
+      },
+      locateCommand: platform => platform === 'win32' ? 'pip' : 'pip3',
     },
     {
       id: 'pnpm',

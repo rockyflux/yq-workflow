@@ -15,6 +15,7 @@ import {
   restorePromptFileFromBackup,
   writePromptFileWithBackup,
 } from '../utils/prompt-files'
+import { getSpawnCommand } from '../utils/platform'
 
 type PromptWebOptions = {
   openBrowser?: boolean
@@ -50,12 +51,11 @@ export async function launchPromptWebDetached(profileId: PromptProfileId = DEFAU
   }
 
   const isTypeScriptEntry = scriptPath.endsWith('.ts')
-  const command = isTypeScriptEntry ? getPnpmCommand() : process.execPath
-  const args = isTypeScriptEntry
-    ? ['exec', 'tsx', 'src/cli.ts', 'config', 'prompt-web']
-    : [scriptPath, 'config', 'prompt-web']
+  const launchCommand = isTypeScriptEntry
+    ? getSpawnCommand('pnpm', ['exec', 'tsx', 'src/cli.ts', 'config', 'prompt-web'])
+    : { command: process.execPath, args: [scriptPath, 'config', 'prompt-web'] }
 
-  const child = spawn(command, args, {
+  const child = spawn(launchCommand.command, launchCommand.args, {
     cwd: process.cwd(),
     detached: true,
     stdio: 'ignore',
@@ -320,10 +320,6 @@ function getOwnerPidFromEnv(): number | null {
   }
 
   return ownerPid
-}
-
-function getPnpmCommand(): string {
-  return process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'
 }
 
 function registerOwnedPromptWebProcess(pid: number | undefined): void {
