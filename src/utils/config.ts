@@ -68,5 +68,10 @@ export function createDefaultConfig(options: {
       liteMode: options.liteMode || false,
       skipImpeccable: options.skipImpeccable || false,
     },
+    telemetry: {
+      counterApi: {
+        workspace: 'yq-workflow',
+      },
+    },
   }
 }

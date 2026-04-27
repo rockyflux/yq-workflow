@@ -24,6 +24,12 @@ export interface CcgConfig {
     liteMode?: boolean
     skipImpeccable?: boolean
   }
+  telemetry?: {
+    counterApi?: {
+      workspace?: string
+      accessToken?: string
+    }
+  }
 }
 
 // 工作流定义

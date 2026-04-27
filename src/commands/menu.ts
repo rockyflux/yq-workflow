@@ -24,8 +24,9 @@ import {
   runPopularWorkflowsMenu,
 } from './menu-managed-packages'
 import { configSkills, showHelp } from './menu-skills'
-import { renderMenuStatus } from './menu-status'
+import { loadMenuAnnouncement, renderMenuStatus } from './menu-status'
 import { i18n } from '../i18n'
+import { trackMenuLaunch } from '../utils/counterapi'
 import { uninstallWorkflows } from '../utils/installer'
 import { readCcgConfig, writeCcgConfig } from '../utils/config'
 
@@ -152,8 +153,11 @@ async function uninstall(): Promise<boolean> {
 }
 
 export async function showMainMenu(): Promise<void> {
+  void trackMenuLaunch()
+  const announcement = await loadMenuAnnouncement()
+
   while (true) {
-    const installStatus = await renderMenuStatus(HEADER_INNER_WIDTH, MENU_RESOURCES)
+    const installStatus = await renderMenuStatus(HEADER_INNER_WIDTH, MENU_RESOURCES, announcement)
     const updateMenuChoice = installStatus.isCurrentNewer
       ? `${ansis.yellow('2. 更新工作流')}  ${ansis.yellowBright('-  更新到最新版本')} ${ansis.bgYellow.black(' 有版本更新 ')}`
       : formatMenuChoice('2. 更新工作流', '- 更新到最新版本')
@@ -185,7 +189,9 @@ export async function showMainMenu(): Promise<void> {
       ],
     }])
 
-    switch (action as MenuAction) {
+    const selectedAction = action as MenuAction
+
+    switch (selectedAction) {
       case 'init':
         await init()
         break
@@ -241,7 +247,7 @@ export async function showMainMenu(): Promise<void> {
       await writeCcgConfig(currentConfig)
     }
 
-    if (shouldPauseAfterMainMenuAction(action as MenuAction)) {
+    if (shouldPauseAfterMainMenuAction(selectedAction)) {
       await inquirer.prompt([{
         type: 'input',
         name: 'continue',

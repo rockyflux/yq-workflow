@@ -9,6 +9,9 @@ import { readCcgConfig } from '../utils/config'
 import { PACKAGE_ROOT } from '../utils/installer-template'
 import { compareVersions } from '../utils/version'
 
+const MENU_ANNOUNCEMENT_URL = 'https://plainraw.com/raw/7e7659f4e301'
+const MENU_ANNOUNCEMENT_TIMEOUT_MS = 1500
+
 type InstallStatus = {
   isInstalled: boolean
   installedVersion: string | null
@@ -127,13 +130,13 @@ function printInstallStatus(status: InstallStatus): void {
     return
   }
 
-  console.log(`  已安装版本: ${ansis.yellow(`v${installedVersion}`)}`)
-
   if (!status.needsUpdate) {
-    console.log(ansis.green(`  当前启动版本与已安装版本一致: v${status.currentVersion}`))
+    console.log(ansis.green(`  当前是最新安装版本: v${status.currentVersion}`))
     console.log()
     return
   }
+
+  console.log(`  已安装版本: ${ansis.yellow(`v${installedVersion}`)}`)
 
   const reminder = status.isCurrentNewer
     ? `检测到已安装版本较旧，当前启动版本为 v${status.currentVersion}，可直接在主菜单选择更新`
@@ -143,13 +146,132 @@ function printInstallStatus(status: InstallStatus): void {
   console.log()
 }
 
-function createHeaderLine(innerWidth: number, content = ''): string {
-  return `║${content.padStart(Math.floor((innerWidth + content.length) / 2)).padEnd(innerWidth)}║`
+function formatHeaderResourceLine(label: string, url: string): string {
+  return `${label} ${url}`
 }
 
-function drawHeader(innerWidth: number, commandCount: number, skillCount: number): void {
+function repeatBorder(char: string, count: number): string {
+  return char.repeat(Math.max(count, 0))
+}
+
+function isFullwidthCodePoint(codePoint: number): boolean {
+  if (codePoint < 0x1100) {
+    return false
+  }
+
+  return (
+    codePoint <= 0x115F
+    || codePoint === 0x2329
+    || codePoint === 0x232A
+    || (codePoint >= 0x2E80 && codePoint <= 0xA4CF && codePoint !== 0x303F)
+    || (codePoint >= 0xAC00 && codePoint <= 0xD7A3)
+    || (codePoint >= 0xF900 && codePoint <= 0xFAFF)
+    || (codePoint >= 0xFE10 && codePoint <= 0xFE19)
+    || (codePoint >= 0xFE30 && codePoint <= 0xFE6F)
+    || (codePoint >= 0xFF00 && codePoint <= 0xFF60)
+    || (codePoint >= 0xFFE0 && codePoint <= 0xFFE6)
+    || (codePoint >= 0x1F300 && codePoint <= 0x1FAFF)
+    || (codePoint >= 0x20000 && codePoint <= 0x3FFFD)
+  )
+}
+
+function getDisplayWidth(value: string): number {
+  let width = 0
+  for (const char of value) {
+    const codePoint = char.codePointAt(0) ?? 0
+    width += isFullwidthCodePoint(codePoint) ? 2 : 1
+  }
+  return width
+}
+
+function padDisplay(value: string, targetWidth: number): string {
+  const padding = Math.max(targetWidth - getDisplayWidth(value), 0)
+  return value + ' '.repeat(padding)
+}
+
+function centerDisplay(value: string, targetWidth: number): string {
+  const displayWidth = getDisplayWidth(value)
+  if (displayWidth >= targetWidth) {
+    return value
+  }
+
+  const remaining = targetWidth - displayWidth
+  const leftPadding = Math.floor(remaining / 2)
+  const rightPadding = remaining - leftPadding
+  return `${' '.repeat(leftPadding)}${value}${' '.repeat(rightPadding)}`
+}
+
+function createHeaderLine(innerWidth: number, content = ''): string {
+  return `║${centerDisplay(content, innerWidth)}║`
+}
+
+function getHeaderWidth(
+  baseInnerWidth: number,
+  commandCount: number,
+  skillCount: number,
+  resources: ReadonlyArray<{ label: string, url: string }>,
+): number {
+  const fixedLines = [
+    '██╗   ██╗ ██████╗',
+    '╚██╗ ██╔╝██╔═══██╗',
+    ' ╚████╔╝ ██║   ██║',
+    '  ╚██╔╝  ██║▄▄ ██║',
+    '   ██║   ╚██████╔╝',
+    '   ╚═╝    ╚══▀▀═╝',
+    'AI Coding Toolkit',
+    'Workflow + Tools + MCP',
+    `v${version} | ${commandCount} commands | ${skillCount} skills | zh-CN`,
+    `build ${buildDate}`,
+    ...resources.map(resource => formatHeaderResourceLine(resource.label, resource.url)),
+  ]
+
+  const maxContentWidth = Math.max(...fixedLines.map(getDisplayWidth))
+  const terminalWidth = process.stdout.columns ?? (baseInnerWidth + 2)
+  const maxInnerWidth = Math.max(terminalWidth - 2, 20)
+
+  return Math.min(Math.max(baseInnerWidth, maxContentWidth + 2), maxInnerWidth)
+}
+
+function wrapPlainText(text: string, maxWidth: number): string[] {
+  if (maxWidth <= 0) {
+    return [text]
+  }
+
+  const lines: string[] = []
+  let current = ''
+
+  for (const char of text) {
+    if (getDisplayWidth(current + char) > maxWidth) {
+      if (current) {
+        lines.push(current)
+      }
+      current = char
+      continue
+    }
+
+    current += char
+  }
+
+  if (current) {
+    lines.push(current)
+  }
+
+  return lines.length > 0 ? lines : ['']
+}
+
+function drawHeader(
+  baseInnerWidth: number,
+  commandCount: number,
+  skillCount: number,
+  resources: ReadonlyArray<{ label: string, url: string }>,
+): void {
+  const innerWidth = getHeaderWidth(baseInnerWidth, commandCount, skillCount, resources)
+  const resourceLines = resources.flatMap((resource) => {
+    const wrappedLines = wrapPlainText(formatHeaderResourceLine(resource.label, resource.url), innerWidth)
+    return wrappedLines.map(line => createHeaderLine(innerWidth, line))
+  })
   const lines = [
-    '╔════════════════════════════════════════════════════════════╗',
+    `╔${repeatBorder('═', innerWidth)}╗`,
     createHeaderLine(innerWidth),
     createHeaderLine(innerWidth, '██╗   ██╗ ██████╗'),
     createHeaderLine(innerWidth, '╚██╗ ██╔╝██╔═══██╗'),
@@ -163,8 +285,8 @@ function drawHeader(innerWidth: number, commandCount: number, skillCount: number
     createHeaderLine(innerWidth),
     createHeaderLine(innerWidth, `v${version} | ${commandCount} commands | ${skillCount} skills | zh-CN`),
     createHeaderLine(innerWidth, `build ${buildDate}`),
-    createHeaderLine(innerWidth),
-    '╚════════════════════════════════════════════════════════════╝',
+    ...resourceLines,
+    `╚${repeatBorder('═', innerWidth)}╝`,
   ]
 
   console.log()
@@ -174,10 +296,42 @@ function drawHeader(innerWidth: number, commandCount: number, skillCount: number
   console.log()
 }
 
-function printMenuResources(resources: ReadonlyArray<{ label: string, url: string }>): void {
-  console.log(ansis.cyan('  参考资源'))
-  for (const resource of resources) {
-    console.log(`  ${ansis.green(resource.label.padEnd(16))} ${ansis.gray(resource.url)}`)
+export async function loadMenuAnnouncement(): Promise<string | null> {
+  try {
+    const response = await fetch(MENU_ANNOUNCEMENT_URL, {
+      signal: AbortSignal.timeout(MENU_ANNOUNCEMENT_TIMEOUT_MS),
+    })
+
+    if (!response.ok) {
+      return null
+    }
+
+    const content = (await response.text())
+      .split(/\r?\n/u)
+      .map(line => line.trim())
+      .filter(Boolean)
+      .join('\n')
+
+    return content || null
+  }
+  catch {
+    return null
+  }
+}
+
+function printMenuAnnouncement(announcement: string | null): void {
+  if (!announcement) {
+    return
+  }
+
+  const terminalWidth = process.stdout.columns ?? 120
+  const contentWidth = Math.max(terminalWidth - 2, 20)
+
+  console.log(ansis.cyan('  公告'))
+  for (const line of announcement.split('\n')) {
+    for (const wrappedLine of wrapPlainText(line, contentWidth)) {
+      console.log(`  ${ansis.yellow(wrappedLine)}`)
+    }
   }
   console.log()
 }
@@ -185,6 +339,7 @@ function printMenuResources(resources: ReadonlyArray<{ label: string, url: strin
 export async function renderMenuStatus(
   innerWidth: number,
   resources: ReadonlyArray<{ label: string, url: string }>,
+  announcement: string | null = null,
 ): Promise<InstallStatus> {
   const [commandCount, skillCount] = await Promise.all([
     countInstalledCommands(),
@@ -192,9 +347,9 @@ export async function renderMenuStatus(
   ])
   const installStatus = await getInstallStatus(commandCount)
 
-  drawHeader(innerWidth, commandCount, skillCount)
+  drawHeader(innerWidth, commandCount, skillCount, resources)
   printInstallStatus(installStatus)
-  printMenuResources(resources)
+  printMenuAnnouncement(announcement)
 
   return installStatus
 }
