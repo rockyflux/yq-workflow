@@ -1,6 +1,31 @@
 ---
 name: yq-api-design
 description: Use when a service, frontend, or integration needs stable endpoint contracts, request and response schemas, error models, versioning, or interaction rules.
+upstream:
+  - yq-system-design
+  - yq-req-analysis
+downstream:
+  - yq-code-gen
+  - yq-test-gen
+  - yq-security-scan
+route_when:
+  - if: 需求目标还没定
+    go:
+      - yq-req-analysis
+  - if: 主要是系统层面的模块与流程
+    go:
+      - yq-system-design
+  - if: 主要是数据库建模
+    go:
+      - yq-db-design
+  - if: 只是在解释现有接口代码
+    go:
+      - yq-code-explain
+handoff:
+  next_recommended: yq-code-gen
+  alternates:
+    - yq-test-gen
+    - yq-security-scan
 ---
 
 # YQ API Design
@@ -52,6 +77,12 @@ description: Use when a service, frontend, or integration needs stable endpoint 
 - 上游通常来自 `yq-system-design`
 - 下游通常接 `yq-code-gen`、`yq-test-gen`
 - 评估安全面时接 `yq-security-scan`
+
+## Recommended Next Step
+
+- 默认交给 `yq-code-gen`，把契约、错误模型和兼容策略落进实现
+- 如果要先保护接口行为或契约边界，可先接 `yq-test-gen`
+- 如果接口涉及认证、授权或输入暴露面，补 `yq-security-scan`
 
 ## Common Mistakes
 

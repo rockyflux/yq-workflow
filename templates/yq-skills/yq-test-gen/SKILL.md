@@ -1,6 +1,27 @@
 ---
 name: yq-test-gen
 description: Use when behavior needs executable test coverage for new features, bug fixes, regressions, unit or integration cases, or risk-based validation.
+upstream:
+  - yq-code-gen
+  - yq-debug
+downstream:
+  - yq-code-review
+  - yq-security-scan
+route_when:
+  - if: 行为和边界还没定
+    go:
+      - yq-req-analysis
+      - yq-system-design
+  - if: 主要是实现功能
+    go:
+      - yq-code-gen
+  - if: 主要是审查改动质量
+    go:
+      - yq-code-review
+handoff:
+  next_recommended: yq-code-review
+  alternates:
+    - yq-security-scan
 ---
 
 # YQ Test Generation
@@ -50,6 +71,11 @@ description: Use when behavior needs executable test coverage for new features, 
 - 上游通常来自 `yq-code-gen`、`yq-debug`
 - 下游通常接 `yq-code-review`、`yq-security-scan`
 - 写行为保护时建议参考 `superpowers:test-driven-development`
+
+## Recommended Next Step
+
+- 默认交给 `yq-code-review`，检查正确性、回归风险和测试缺口
+- 如果改动涉及权限、敏感数据或外部输入，可并行补 `yq-security-scan`
 
 ## Common Mistakes
 

@@ -1,6 +1,29 @@
 ---
 name: yq-performance-opt
 description: Use when latency, throughput, resource usage, or scalability concerns need evidence-based bottleneck analysis and optimization trade-offs.
+upstream:
+  - yq-debug
+  - yq-log-analysis
+  - yq-db-design
+downstream:
+  - yq-code-refactor
+  - yq-code-gen
+  - yq-doc-gen
+route_when:
+  - if: 主要是功能 bug
+    go:
+      - yq-debug
+  - if: 主要是数据库建模
+    go:
+      - yq-db-design
+  - if: 主要是代码结构清理
+    go:
+      - yq-code-refactor
+handoff:
+  next_recommended: yq-code-refactor
+  alternates:
+    - yq-code-gen
+    - yq-doc-gen
 ---
 
 # YQ Performance Optimization
@@ -50,6 +73,11 @@ description: Use when latency, throughput, resource usage, or scalability concer
 - 常与 `yq-debug`、`yq-log-analysis` 配合
 - 结构性优化可继续接 `yq-code-refactor`
 - 实施优化时下游通常接 `yq-code-gen`
+
+## Recommended Next Step
+
+- 如果已经确认优化方向，默认接 `yq-code-refactor` 或 `yq-code-gen` 落地
+- 如果需要把瓶颈证据、指标和优化取舍沉淀下来，补 `yq-doc-gen`
 
 ## Common Mistakes
 

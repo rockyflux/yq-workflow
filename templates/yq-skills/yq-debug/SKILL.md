@@ -1,6 +1,28 @@
 ---
 name: yq-debug
 description: Use when incorrect behavior, failing tests, incidents, or hard-to-explain runtime problems need reproduction, evidence gathering, root-cause analysis, and a safe next step.
+upstream:
+  - yq-code-explain
+  - yq-log-analysis
+downstream:
+  - yq-code-gen
+  - yq-test-gen
+  - yq-log-analysis
+route_when:
+  - if: 主要是读懂代码结构
+    go:
+      - yq-code-explain
+  - if: 已知根因，只差落地修复
+    go:
+      - yq-code-gen
+  - if: 输入主要是日志集合
+    go:
+      - yq-log-analysis
+handoff:
+  next_recommended: yq-code-gen
+  alternates:
+    - yq-test-gen
+    - yq-log-analysis
 ---
 
 # YQ Debug
@@ -51,6 +73,12 @@ description: Use when incorrect behavior, failing tests, incidents, or hard-to-e
 - 常与 `yq-log-analysis`、`yq-code-explain` 配合
 - 下游通常接 `yq-code-gen`、`yq-test-gen`
 - 排障过程建议参考 `superpowers:systematic-debugging`
+
+## Recommended Next Step
+
+- 已确认根因后，默认交给 `yq-code-gen` 落地修复
+- 如果需要用测试锁住复现路径和回归风险，接 `yq-test-gen`
+- 如果当前证据仍然以日志为主，先补 `yq-log-analysis`
 
 ## Common Mistakes
 

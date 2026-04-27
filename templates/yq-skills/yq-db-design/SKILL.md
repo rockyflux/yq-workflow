@@ -1,6 +1,30 @@
 ---
 name: yq-db-design
 description: Use when a feature needs database schema design, entity relationships, indexes, migrations, data lifecycle rules, or persistence trade-offs.
+upstream:
+  - yq-system-design
+downstream:
+  - yq-code-gen
+  - yq-test-gen
+  - yq-performance-opt
+route_when:
+  - if: 需求和业务范围还不清楚
+    go:
+      - yq-req-analysis
+  - if: 主要是接口契约
+    go:
+      - yq-api-design
+  - if: 主要是实现 Repository 或 SQL
+    go:
+      - yq-code-gen
+  - if: 主要是性能排查
+    go:
+      - yq-performance-opt
+handoff:
+  next_recommended: yq-code-gen
+  alternates:
+    - yq-test-gen
+    - yq-performance-opt
 ---
 
 # YQ Database Design
@@ -52,6 +76,12 @@ description: Use when a feature needs database schema design, entity relationshi
 - 上游通常来自 `yq-system-design`
 - 下游通常接 `yq-code-gen`、`yq-test-gen`
 - 数据性能问题可继续接 `yq-performance-opt`
+
+## Recommended Next Step
+
+- 默认交给 `yq-code-gen`，把 schema、索引和迁移方案落成实现
+- 如果需要先保护数据读写行为，可先补 `yq-test-gen`
+- 如果当前焦点已经转到查询瓶颈或索引收益，改走 `yq-performance-opt`
 
 ## Common Mistakes
 

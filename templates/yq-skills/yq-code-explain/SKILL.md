@@ -1,6 +1,29 @@
 ---
 name: yq-code-explain
 description: Use when code purpose, module responsibilities, data flow, dependencies, or hidden assumptions need to be explained for onboarding, debugging, or safe changes.
+upstream:
+  - yq-init-project
+downstream:
+  - yq-debug
+  - yq-code-refactor
+  - yq-code-gen
+  - yq-system-design
+route_when:
+  - if: 主要是定位故障和根因
+    go:
+      - yq-debug
+  - if: 主要是交付新代码
+    go:
+      - yq-code-gen
+  - if: 主要是评审改动风险
+    go:
+      - yq-code-review
+handoff:
+  next_recommended: yq-debug
+  alternates:
+    - yq-code-refactor
+    - yq-code-gen
+    - yq-system-design
 ---
 
 # YQ Code Explain
@@ -50,6 +73,12 @@ description: Use when code purpose, module responsibilities, data flow, dependen
 - 作为 `yq-debug`、`yq-code-refactor` 的常见前置
 - 看完代码后准备动手实现时接 `yq-code-gen`
 - 需要系统层解读时可回到 `yq-system-design`
+
+## Recommended Next Step
+
+- 如果解释结果暴露了异常路径或怀疑点，默认接 `yq-debug`
+- 如果已经明确结构问题，改接 `yq-code-refactor`
+- 如果目的只是理解后继续实现，接 `yq-code-gen`
 
 ## Common Mistakes
 

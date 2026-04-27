@@ -1,6 +1,28 @@
 ---
 name: yq-doc-gen
 description: 当需要从实现结果沉淀 README、DESIGN、交付说明、运行手册、变更记录等文档资产时使用。
+upstream:
+  - yq-code-review
+  - yq-security-scan
+  - yq-dependency-check
+  - yq-performance-opt
+downstream:
+  - yq-git-helper
+route_when:
+  - if: 主要目标是架构方案设计
+    go:
+      - yq-system-design
+  - if: 主要目标是编码实现
+    go:
+      - yq-code-gen
+  - if: 主要目标是发布分支、PR、提交整理
+    go:
+      - yq-git-helper
+  - if: 主要目标是测试用例设计与补全
+    go:
+      - yq-test-gen
+handoff:
+  next_recommended: yq-git-helper
 ---
 
 # 📝 YQ 文档生成器
@@ -88,6 +110,17 @@ description: 当需要从实现结果沉淀 README、DESIGN、交付说明、运
 - [ ] 风险、限制与回滚策略是否完整
 - [ ] 术语、命名、路径是否与代码一致
 - [ ] TODO 项是否可追踪（责任人/条件/后续动作）
+
+## Related Skills
+
+- 上游通常来自 `yq-code-review`、`yq-security-scan`、`yq-dependency-check`
+- 文档中若需要补充架构取舍，可回看 `yq-system-design`
+- 完成交付材料后通常接 `yq-git-helper`
+
+## Recommended Next Step
+
+- 默认交给 `yq-git-helper`，把文档、验证结果和风险说明整理进提交或 PR 叙事
+- 如果文档暴露出实现或配置缺口，回跳 `yq-code-gen` 或 `yq-config-gen`
 
 ## 常见问题
 

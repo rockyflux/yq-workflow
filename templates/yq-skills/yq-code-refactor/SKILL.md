@@ -1,6 +1,29 @@
 ---
 name: yq-code-refactor
 description: Use when existing code needs safer structural cleanup, duplication removal, modularization, or maintainability improvement without intentionally changing expected behavior.
+upstream:
+  - yq-code-review
+  - yq-performance-opt
+  - yq-code-explain
+downstream:
+  - yq-test-gen
+  - yq-code-review
+  - yq-doc-gen
+route_when:
+  - if: 主要是新增功能
+    go:
+      - yq-code-gen
+  - if: 主要是根因排查
+    go:
+      - yq-debug
+  - if: 主要是质量审查
+    go:
+      - yq-code-review
+handoff:
+  next_recommended: yq-test-gen
+  alternates:
+    - yq-code-review
+    - yq-doc-gen
 ---
 
 # YQ Code Refactor
@@ -49,6 +72,12 @@ description: Use when existing code needs safer structural cleanup, duplication 
 - 上游常来自 `yq-code-review`、`yq-performance-opt`
 - 下游通常接 `yq-test-gen`、`yq-code-review`
 - 验证完成前可参考 `superpowers:verification-before-completion`
+
+## Recommended Next Step
+
+- 默认接 `yq-test-gen`，先保护重构后的行为边界
+- 然后回到 `yq-code-review`，确认结构改善没有引入新的回归风险
+- 如果需要沉淀结构调整理由和影响面，可补 `yq-doc-gen`
 
 ## Common Mistakes
 

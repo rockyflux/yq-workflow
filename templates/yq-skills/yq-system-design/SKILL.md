@@ -1,6 +1,32 @@
 ---
 name: yq-system-design
 description: Use when a requirement needs architecture decisions, module boundaries, key flows, trade-offs, or an implementation path before coding starts.
+upstream:
+  - yq-req-analysis
+downstream:
+  - yq-api-design
+  - yq-db-design
+  - yq-config-gen
+  - yq-code-gen
+route_when:
+  - if: 范围和验收标准还不清楚
+    go:
+      - yq-req-analysis
+  - if: 主要是接口字段与错误语义
+    go:
+      - yq-api-design
+  - if: 主要是数据库模型
+    go:
+      - yq-db-design
+  - if: 已经有方案，只差落地
+    go:
+      - yq-code-gen
+handoff:
+  next_recommended: yq-api-design
+  alternates:
+    - yq-db-design
+    - yq-config-gen
+    - yq-code-gen
 ---
 
 # YQ System Design
@@ -53,6 +79,11 @@ description: Use when a requirement needs architecture decisions, module boundar
 - 上游通常来自 `yq-req-analysis`
 - 下游常接 `yq-api-design`、`yq-db-design`、`yq-config-gen`、`yq-code-gen`
 - 复杂多步骤实现前可配合 `superpowers:writing-plans`
+
+## Recommended Next Step
+
+- 默认先交给 `yq-api-design`、`yq-db-design`、`yq-config-gen` 细化契约、数据和配置
+- 如果方案已经足够具体，也可以直接进入 `yq-code-gen`
 
 ## Common Mistakes
 

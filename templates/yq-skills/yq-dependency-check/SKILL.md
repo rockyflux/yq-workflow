@@ -1,6 +1,30 @@
 ---
 name: yq-dependency-check
 description: Use when packages or libraries need review for vulnerability exposure, version drift, upgrade risk, compatibility, or supply-chain concerns.
+upstream:
+  - yq-code-review
+  - yq-security-scan
+downstream:
+  - yq-security-scan
+  - yq-code-gen
+  - yq-doc-gen
+  - yq-git-helper
+route_when:
+  - if: 主要是代码漏洞路径
+    go:
+      - yq-security-scan
+  - if: 主要是功能异常排查
+    go:
+      - yq-debug
+  - if: 主要是实现升级代码
+    go:
+      - yq-code-gen
+handoff:
+  next_recommended: yq-security-scan
+  alternates:
+    - yq-code-gen
+    - yq-doc-gen
+    - yq-git-helper
 ---
 
 # YQ Dependency Check
@@ -50,6 +74,12 @@ description: Use when packages or libraries need review for vulnerability exposu
 - 常与 `yq-security-scan`、`yq-doc-gen` 配合
 - 涉及代码改造时下游通常接 `yq-code-gen`
 - 发版说明可继续交给 `yq-git-helper`
+
+## Recommended Next Step
+
+- 如果依赖风险会扩散到应用攻击面，默认接 `yq-security-scan`
+- 如果已经决定升级或替换实现，接 `yq-code-gen`
+- 如果需要同步升级说明、验证重点和交付注意事项，补 `yq-doc-gen` 或 `yq-git-helper`
 
 ## Common Mistakes
 

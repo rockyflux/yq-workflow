@@ -1,6 +1,27 @@
 ---
 name: yq-log-analysis
 description: Use when application, system, or trace logs need to be turned into timelines, signals, suspicious patterns, and actionable debugging findings.
+upstream:
+  - yq-debug
+downstream:
+  - yq-debug
+  - yq-performance-opt
+  - yq-security-scan
+route_when:
+  - if: 主要是代码根因分析
+    go:
+      - yq-debug
+  - if: 主要是性能基线和瓶颈
+    go:
+      - yq-performance-opt
+  - if: 主要是安全异常和攻击迹象
+    go:
+      - yq-security-scan
+handoff:
+  next_recommended: yq-debug
+  alternates:
+    - yq-performance-opt
+    - yq-security-scan
 ---
 
 # YQ Log Analysis
@@ -50,6 +71,12 @@ description: Use when application, system, or trace logs need to be turned into 
 - 常作为 `yq-debug` 前置
 - 性能侧分析可继续接 `yq-performance-opt`
 - 涉及攻击或越权迹象时接 `yq-security-scan`
+
+## Recommended Next Step
+
+- 默认交给 `yq-debug`，把时间线和异常信号转成根因假设验证
+- 如果日志已经明确指向资源瓶颈，改接 `yq-performance-opt`
+- 如果日志里出现越权、扫描或异常访问迹象，接 `yq-security-scan`
 
 ## Common Mistakes
 

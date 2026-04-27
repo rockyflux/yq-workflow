@@ -1,6 +1,27 @@
 ---
 name: yq-git-helper
 description: Use when branches, commits, pull requests, merge readiness, or delivery packaging need to be organized for team handoff.
+upstream:
+  - yq-code-review
+  - yq-doc-gen
+  - yq-dependency-check
+downstream:
+  - superpowers:verification-before-completion
+  - superpowers:finishing-a-development-branch
+route_when:
+  - if: 主要是实现功能
+    go:
+      - yq-code-gen
+  - if: 主要是代码质量审查
+    go:
+      - yq-code-review
+  - if: 主要是运行或技术文档
+    go:
+      - yq-doc-gen
+handoff:
+  next_recommended: superpowers:verification-before-completion
+  alternates:
+    - superpowers:finishing-a-development-branch
 ---
 
 # YQ Git Helper
@@ -50,6 +71,11 @@ description: Use when branches, commits, pull requests, merge readiness, or deli
 - 上游通常来自 `yq-code-review`、`yq-doc-gen`
 - 完成前验证可参考 `superpowers:verification-before-completion`
 - 分支收口流程可参考 `superpowers:finishing-a-development-branch`
+
+## Recommended Next Step
+
+- 默认先走 `superpowers:verification-before-completion`，确认交付说法和验证证据一致
+- 需要继续收口分支、提交和合并动作时，接 `superpowers:finishing-a-development-branch`
 
 ## Common Mistakes
 

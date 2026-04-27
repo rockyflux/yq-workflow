@@ -1,6 +1,33 @@
 ---
 name: yq-req-analysis
 description: Use when requirements are vague, conflicting, incomplete, or likely to cause rework unless scope, constraints, actors, and acceptance criteria are clarified first.
+upstream:
+  - yq-init-project
+downstream:
+  - yq-system-design
+  - yq-api-design
+  - yq-db-design
+  - yq-code-gen
+  - yq-debug
+route_when:
+  - if: 系统方案和模块边界已成为主要问题
+    go:
+      - yq-system-design
+  - if: 主要是接口契约
+    go:
+      - yq-api-design
+  - if: 主要是表结构和迁移
+    go:
+      - yq-db-design
+  - if: 主要是实现或修 bug
+    go:
+      - yq-code-gen
+      - yq-debug
+handoff:
+  next_recommended: yq-system-design
+  alternates:
+    - yq-api-design
+    - yq-db-design
 ---
 
 # YQ Requirement Analysis
@@ -52,6 +79,11 @@ description: Use when requirements are vague, conflicting, incomplete, or likely
 - 下游通常接 `yq-system-design`
 - 细化接口或数据时接 `yq-api-design`、`yq-db-design`
 - 如果需求是多步骤交付输入，可参考 `superpowers:writing-plans`
+
+## Recommended Next Step
+
+- 默认交给 `yq-system-design`，把目标、边界和验收转成实现方案
+- 如果需求已经明确收敛在接口或数据面，也可以直接进入 `yq-api-design` 或 `yq-db-design`
 
 ## Common Mistakes
 

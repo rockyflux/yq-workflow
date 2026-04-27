@@ -1,6 +1,28 @@
 ---
 name: yq-config-gen
 description: Use when an application needs environment variables, config templates, runtime settings, or safer configuration organization before delivery.
+upstream:
+  - yq-system-design
+downstream:
+  - yq-code-gen
+  - yq-doc-gen
+  - yq-security-scan
+route_when:
+  - if: 主要是系统架构设计
+    go:
+      - yq-system-design
+  - if: 主要是代码实现
+    go:
+      - yq-code-gen
+  - if: 主要是部署或分支交付说明
+    go:
+      - yq-doc-gen
+      - yq-git-helper
+handoff:
+  next_recommended: yq-code-gen
+  alternates:
+    - yq-doc-gen
+    - yq-security-scan
 ---
 
 # YQ Config Generation
@@ -50,6 +72,12 @@ description: Use when an application needs environment variables, config templat
 - 上游通常来自 `yq-system-design`
 - 下游通常接 `yq-code-gen`、`yq-doc-gen`
 - 涉及敏感项时可配合 `yq-security-scan`
+
+## Recommended Next Step
+
+- 默认交给 `yq-code-gen`，把配置读取、校验和失败语义落到实现里
+- 如果重点已经转到交付说明或运行手册，改接 `yq-doc-gen`
+- 如果配置里包含密钥、凭证或高风险开关，补 `yq-security-scan`
 
 ## Common Mistakes
 

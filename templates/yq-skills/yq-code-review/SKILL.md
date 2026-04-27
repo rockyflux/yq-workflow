@@ -1,6 +1,30 @@
 ---
 name: yq-code-review
 description: Use when changes need reviewer-style scrutiny for correctness, regression risk, maintainability, missing tests, or delivery readiness before merge or release.
+upstream:
+  - yq-test-gen
+  - yq-code-gen
+  - yq-debug
+downstream:
+  - yq-code-refactor
+  - yq-doc-gen
+  - yq-security-scan
+route_when:
+  - if: 主要是解释代码
+    go:
+      - yq-code-explain
+  - if: 主要是修 bug 或落地实现
+    go:
+      - yq-debug
+      - yq-code-gen
+  - if: 主要是安全威胁分析
+    go:
+      - yq-security-scan
+handoff:
+  next_recommended: yq-code-refactor
+  alternates:
+    - yq-doc-gen
+    - yq-security-scan
 ---
 
 <codex_skill_adapter>
@@ -72,6 +96,18 @@ Execution gates:
 6. Result presentation (severity-first findings + open questions + next steps)
 </process>
 
+## When to Use
+
+- 用户要做 reviewer 风格审查，而不是直接修改代码
+- 需要从正确性、回归风险、可维护性和缺测角度看改动
+- 准备合并、提测或发布，需要判断当前改动是否具备交付条件
+
+## Route Elsewhere
+
+- 主要是解释代码：转 `yq-code-explain`
+- 主要是修 bug 或落地实现：转 `yq-debug`、`yq-code-gen`
+- 主要是安全威胁分析：转 `yq-security-scan`
+
 <output_template>
 ```markdown
 # Code Review
@@ -94,11 +130,18 @@ For each finding:
 - **Fix direction**: smallest safe fix direction
 </output_template>
 
-<route_elsewhere>
-- Mostly code explanation: `yq-code-explain`
-- Mostly bug fixing/implementation: `yq-debug`, `yq-code-gen`
-- Security-focused threat analysis: `yq-security-scan`
-</route_elsewhere>
+## Related Skills
+
+- 上游常来自 `yq-test-gen`、`yq-code-gen`、`yq-debug`
+- 发现结构性问题时通常转 `yq-code-refactor`
+- 需要补交付材料时接 `yq-doc-gen`
+- 涉及权限、敏感数据或边界信任问题时并行看 `yq-security-scan`
+
+## Recommended Next Step
+
+- 如果发现中高风险问题，默认交给 `yq-code-refactor` 或 `yq-code-gen` 修复
+- 如果审查通过且需要沉淀交付材料，接 `yq-doc-gen`
+- 如果风险集中在安全面，改走 `yq-security-scan`
 
 <common_mistakes>
 - Discussing style while missing behavior risks

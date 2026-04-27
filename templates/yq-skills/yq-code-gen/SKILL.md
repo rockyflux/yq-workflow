@@ -1,6 +1,36 @@
 ---
 name: yq-code-gen
 description: Use when requirements or designs are ready to be turned into production code for feature delivery, scaffolding, implementation gaps, or maintainable module creation.
+upstream:
+  - yq-req-analysis
+  - yq-system-design
+  - yq-api-design
+  - yq-db-design
+  - yq-config-gen
+downstream:
+  - yq-test-gen
+  - yq-code-review
+  - yq-security-scan
+route_when:
+  - if: 范围或验收标准还不清楚
+    go:
+      - yq-req-analysis
+  - if: 方案和边界还没定
+    go:
+      - yq-system-design
+      - yq-api-design
+      - yq-db-design
+  - if: 重点是重构旧代码
+    go:
+      - yq-code-refactor
+  - if: 重点是定位问题
+    go:
+      - yq-debug
+handoff:
+  next_recommended: yq-test-gen
+  alternates:
+    - yq-code-review
+    - yq-security-scan
 ---
 
 # YQ Code Generation
@@ -50,6 +80,12 @@ description: Use when requirements or designs are ready to be turned into produc
 - 上游通常来自 `yq-req-analysis`、`yq-system-design`、`yq-api-design`、`yq-db-design`
 - 下游通常接 `yq-test-gen`、`yq-code-review`、`yq-security-scan`
 - 编码前后的验证纪律可参考 `superpowers:test-driven-development`
+
+## Recommended Next Step
+
+- 默认交给 `yq-test-gen`，先把关键行为和回归风险锁住
+- 如果需要先做人审视角的风险收敛，可接 `yq-code-review`
+- 如果改动涉及认证、授权、敏感数据或外部输入，可并行补 `yq-security-scan`
 
 ## Common Mistakes
 

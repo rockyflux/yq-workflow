@@ -1,6 +1,27 @@
 ---
 name: yq-security-scan
 description: Use when application changes need a security-focused review for exploit paths, auth gaps, data exposure, trust boundaries, or release-blocking vulnerabilities.
+upstream:
+  - yq-code-review
+  - yq-test-gen
+  - yq-dependency-check
+downstream:
+  - yq-code-gen
+  - yq-doc-gen
+route_when:
+  - if: 主要是普通代码质量 review
+    go:
+      - yq-code-review
+  - if: 主要是依赖版本风险
+    go:
+      - yq-dependency-check
+  - if: 主要是故障排查
+    go:
+      - yq-debug
+handoff:
+  next_recommended: yq-code-gen
+  alternates:
+    - yq-doc-gen
 ---
 
 # YQ Security Scan
@@ -49,7 +70,12 @@ description: Use when application changes need a security-focused review for exp
 
 - 常与 `yq-code-review`、`yq-dependency-check` 配合
 - 修复安全问题时下游通常接 `yq-code-gen`
-- 更系统的安全规则可参考 `security-auditor` 风格
+- 沉淀上线风险、缓解措施和注意事项时可继续接 `yq-doc-gen`
+
+## Recommended Next Step
+
+- 如果发现可修复的问题，默认交给 `yq-code-gen` 落地整改
+- 如果需要把风险、缓解措施和发布阻塞项沉淀给团队，接 `yq-doc-gen`
 
 ## Common Mistakes
 
