@@ -51,6 +51,7 @@ export {
   getAgentSkillsDir,
   getCodexDir,
   getCursorDir,
+  getKiroSkillsDir,
   listAgentSkillDirectories,
 } from './installer-paths'
 export type { AgentSkillDirectory } from './installer-paths'

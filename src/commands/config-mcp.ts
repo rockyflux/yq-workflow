@@ -6,7 +6,7 @@ export async function configMcp(): Promise<void> {
   const activeMcpWeb = await getActiveMcpWebState()
   console.log()
   console.log(ansis.cyan.bold('  配置 MCP'))
-  console.log(ansis.gray('  通过本地网页独立管理 Claude / Codex / Gemini 的 MCP 配置'))
+  console.log(ansis.gray('  通过本地网页独立管理 Claude / Codex / Gemini / Cursor / Kiro 的 MCP 配置'))
   console.log(ansis.gray('  预置模板仍按四类维护：必装工具、数据库操作、Git / 版本控制、文件 / 资源操作'))
   if (activeMcpWeb) {
     console.log(ansis.green(`  本地 MCP 配置页运行中：${activeMcpWeb.url}`))

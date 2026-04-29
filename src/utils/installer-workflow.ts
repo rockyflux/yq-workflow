@@ -2,10 +2,11 @@ import type { InstallResult } from '../types'
 import ansis from 'ansis'
 import fs from 'fs-extra'
 import { exec } from 'node:child_process'
+import { homedir } from 'node:os'
 import { basename, dirname, join } from 'pathe'
 import { promisify } from 'node:util'
 import { getWorkflowById } from './installer-data'
-import { getAgentSkillsDir, getCodexDir, getCursorDir } from './installer-paths'
+import { getAgentSkillsDir, getCodexDir, getCursorDir, getKiroDir, getKiroSkillsDir } from './installer-paths'
 import { backupFileIfExists } from './prompt-files'
 import { PACKAGE_ROOT, injectConfigVariables, replaceHomePathsInTemplate } from './installer-template'
 import { installSkillCommands } from './skill-registry'
@@ -274,37 +275,38 @@ async function installYqAgentSkills(ctx: InstallContext): Promise<void> {
   ) return
 
   try {
-    const agentSkillsDir = getAgentSkillsDir()
-    await fs.ensureDir(agentSkillsDir)
+    for (const mirrorRoot of [getAgentSkillsDir(), getKiroSkillsDir()]) {
+      await fs.ensureDir(mirrorRoot)
 
-    if (await fs.pathExists(yqSkillsTemplateDir)) {
-      const yqSkillsDestDir = join(agentSkillsDir, 'yq')
-      await prepareDirectoryDestination(yqSkillsDestDir)
-      await fs.copy(yqSkillsTemplateDir, yqSkillsDestDir, {
-        overwrite: true,
-        errorOnExist: false,
-      })
-      ctx.result.installedAgentSkills = (await getYqAgentTemplateDirNames(ctx.templateDir)).length
-    }
+      if (await fs.pathExists(yqSkillsTemplateDir)) {
+        const yqSkillsDestDir = join(mirrorRoot, 'yq')
+        await prepareDirectoryDestination(yqSkillsDestDir)
+        await fs.copy(yqSkillsTemplateDir, yqSkillsDestDir, {
+          overwrite: true,
+          errorOnExist: false,
+        })
+        ctx.result.installedAgentSkills = (await getYqAgentTemplateDirNames(ctx.templateDir)).length
+      }
 
-    if (await fs.pathExists(baseSkillsTemplateDir)) {
-      const baseSkillsDestDir = join(agentSkillsDir, 'yq-base')
-      await prepareDirectoryDestination(baseSkillsDestDir)
-      await fs.copy(baseSkillsTemplateDir, baseSkillsDestDir, {
-        overwrite: true,
-        errorOnExist: false,
-      })
-      ctx.result.installedBaseSkills = (await getBaseSkillNames(ctx.templateDir)).length
-    }
+      if (await fs.pathExists(baseSkillsTemplateDir)) {
+        const baseSkillsDestDir = join(mirrorRoot, 'yq-base')
+        await prepareDirectoryDestination(baseSkillsDestDir)
+        await fs.copy(baseSkillsTemplateDir, baseSkillsDestDir, {
+          overwrite: true,
+          errorOnExist: false,
+        })
+        ctx.result.installedBaseSkills = (await getBaseSkillNames(ctx.templateDir)).length
+      }
 
-    if (await fs.pathExists(superpowersTemplateDir)) {
-      const superpowersDestDir = join(agentSkillsDir, 'superpowers')
-      await prepareDirectoryDestination(superpowersDestDir)
-      await fs.copy(superpowersTemplateDir, superpowersDestDir, {
-        overwrite: true,
-        errorOnExist: false,
-      })
-      ctx.result.installedSuperpowers = (await getSuperpowersSkillNames(ctx.templateDir)).length
+      if (await fs.pathExists(superpowersTemplateDir)) {
+        const superpowersDestDir = join(mirrorRoot, 'superpowers')
+        await prepareDirectoryDestination(superpowersDestDir)
+        await fs.copy(superpowersTemplateDir, superpowersDestDir, {
+          overwrite: true,
+          errorOnExist: false,
+        })
+        ctx.result.installedSuperpowers = (await getSuperpowersSkillNames(ctx.templateDir)).length
+      }
     }
   }
   catch (error) {
@@ -366,24 +368,71 @@ async function installRuleFiles(ctx: InstallContext): Promise<void> {
   }
 }
 
+function getWorkspaceDocSubpath(workspaceDir = process.cwd()): string[] {
+  const normalized = workspaceDir.replace(/\\/g, '/').replace(/\/+$/, '')
+  const codeMarker = '/Code/'
+  const codeIndex = normalized.lastIndexOf(codeMarker)
+
+  if (codeIndex >= 0) {
+    const relativePart = normalized.slice(codeIndex + codeMarker.length).replace(/^\/+/, '')
+    if (relativePart) {
+      return relativePart.split('/').filter(Boolean)
+    }
+  }
+
+  const segments = normalized.split('/').filter(Boolean)
+  if (segments.length >= 2) {
+    return segments.slice(-2)
+  }
+
+  return segments.slice(-1)
+}
+
+async function ensureSteeringDocumentRoots(): Promise<void> {
+  const userHome = homedir()
+  const workspaceDocSubpath = getWorkspaceDocSubpath()
+  const docRoots = [
+    join(userHome, 'Obsidian', 'Codex'),
+    join(userHome, 'Obsidian', 'Claude'),
+    join(userHome, 'Obsidian', 'Kiro'),
+  ]
+
+  for (const docRoot of docRoots) {
+    await fs.ensureDir(docRoot)
+    if (workspaceDocSubpath.length > 0) {
+      await fs.ensureDir(join(docRoot, ...workspaceDocSubpath))
+    }
+  }
+}
+
 async function installGlobalInstructionFiles(ctx: InstallContext): Promise<void> {
+  const steeringTemplateDir = join(ctx.templateDir, 'steering')
+
   try {
+    await ensureSteeringDocumentRoots()
+
     await installTemplateFile(
       ctx,
-      join(ctx.templateDir, 'AGENTS.md'),
+      join(steeringTemplateDir, 'AGENTS.md'),
       join(getCodexDir(), 'AGENTS.md'),
       { backupBeforeOverwrite: true, overwrite: true },
     )
     await installTemplateFile(
       ctx,
-      join(ctx.templateDir, 'CLAUDE.md'),
+      join(steeringTemplateDir, 'CLAUDE.md'),
       join(ctx.installDir, 'CLAUDE.md'),
       { backupBeforeOverwrite: true, overwrite: true },
     )
     await installTemplateFile(
       ctx,
-      join(ctx.templateDir, 'guidelines.mdc'),
+      join(steeringTemplateDir, 'guidelines.mdc'),
       join(getCursorDir(), 'rules', 'guidelines.mdc'),
+      { backupBeforeOverwrite: true, overwrite: true },
+    )
+    await installTemplateFile(
+      ctx,
+      join(steeringTemplateDir, 'kiro.md'),
+      join(getKiroDir(), 'steering', 'kiro.md'),
       { backupBeforeOverwrite: true, overwrite: true },
     )
   }
@@ -494,6 +543,7 @@ export async function uninstallWorkflows(installDir: string): Promise<UninstallR
   const rulesDir = join(installDir, 'rules')
   const yqConfigDir = join(installDir, '.yq')
   const userAgentSkillsDir = getAgentSkillsDir()
+  const kiroSkillsDir = getKiroSkillsDir()
 
   try {
     result.removedCommands = await removeDirCollectMdNames(commandsDir)
@@ -511,27 +561,29 @@ export async function uninstallWorkflows(installDir: string): Promise<UninstallR
     result.success = false
   }
 
-  if (await fs.pathExists(userAgentSkillsDir)) {
-    try {
-      const yqAgentDirNames = await getYqAgentTemplateDirNames(join(PACKAGE_ROOT, 'templates'))
-      const baseSkillNames = await getBaseSkillNames(join(PACKAGE_ROOT, 'templates'))
-      const mirroredDirNames = [
-        ...(yqAgentDirNames.length > 0 ? ['yq'] : []),
-        ...(baseSkillNames.length > 0 ? ['yq-base'] : []),
-        ...(await hasSuperpowersTemplateDir(join(PACKAGE_ROOT, 'templates')) ? ['superpowers'] : []),
-      ]
+  for (const [mirrorRoot, mirrorLabel] of [[userAgentSkillsDir, '.agents/skills'], [kiroSkillsDir, '.kiro/skills']] as const) {
+    if (await fs.pathExists(mirrorRoot)) {
+      try {
+        const yqAgentDirNames = await getYqAgentTemplateDirNames(join(PACKAGE_ROOT, 'templates'))
+        const baseSkillNames = await getBaseSkillNames(join(PACKAGE_ROOT, 'templates'))
+        const mirroredDirNames = [
+          ...(yqAgentDirNames.length > 0 ? ['yq'] : []),
+          ...(baseSkillNames.length > 0 ? ['yq-base'] : []),
+          ...(await hasSuperpowersTemplateDir(join(PACKAGE_ROOT, 'templates')) ? ['superpowers'] : []),
+        ]
 
-      for (const dirName of new Set(mirroredDirNames)) {
-        const mirroredDir = join(userAgentSkillsDir, dirName)
-        if (await fs.pathExists(mirroredDir)) {
-          await fs.remove(mirroredDir)
-          result.removedAgents.push(dirName)
+        for (const dirName of new Set(mirroredDirNames)) {
+          const mirroredDir = join(mirrorRoot, dirName)
+          if (await fs.pathExists(mirroredDir)) {
+            await fs.remove(mirroredDir)
+            result.removedAgents.push(`${mirrorLabel}:${dirName}`)
+          }
         }
       }
-    }
-    catch (error) {
-      result.errors.push(`Failed to remove mirrored ~/.agents/skills directories: ${error}`)
-      result.success = false
+      catch (error) {
+        result.errors.push(`Failed to remove mirrored ${mirrorLabel} directories: ${error}`)
+        result.success = false
+      }
     }
   }
 

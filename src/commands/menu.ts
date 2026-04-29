@@ -75,6 +75,7 @@ async function configPrompt(): Promise<void> {
   console.log(ansis.gray(`  Codex：${join(homedir(), '.codex', 'AGENTS.md')}`))
   console.log(ansis.gray(`  Gemini：${join(homedir(), '.gemini', 'GEMINI.md')}`))
   console.log(ansis.gray(`  Cursor：${join(homedir(), '.cursor', 'rules', 'guidelines.mdc')}`))
+  console.log(ansis.gray(`  Kiro：${join(homedir(), '.kiro', 'steering', 'kiro.md')}`))
   if (activePromptWeb) {
     console.log(ansis.green(`  本地提示词配置页运行中：${activePromptWeb.url}`))
   }
@@ -172,9 +173,9 @@ export async function showMainMenu(): Promise<void> {
         { name: formatMenuChoice('1. 初始化 / 重装工作流', '- 安装 YQ 工作流'), value: 'init' },
         { name: updateMenuChoice, value: 'update' },
         { name: formatMenuChoice('3. 热门开源工作流', '- GET SHIT DONE / gstack / Trellis'), value: 'popular-workflows' },
-        { name: formatMenuChoice('4. 提示词配置', '- Claude / Codex / Gemini / Cursor 提示词编辑器'), value: 'prompts' },
+        { name: formatMenuChoice('4. 提示词配置', '- Claude / Codex / Gemini / Cursor / Kiro 提示词编辑器'), value: 'prompts' },
         { name: formatMenuChoice('5. 配置 Skills', '- Skills.sh + 本地 Skills 目录'), value: 'skills' },
-        { name: formatMenuChoice('6. 配置 MCP', '- Claude / Codex / Gemini 本地网页管理'), value: 'mcp' },
+        { name: formatMenuChoice('6. 配置 MCP', '- Claude / Codex / Gemini / Cursor / Kiro 本地网页管理'), value: 'mcp' },
         new inquirer.Separator(`${MENU_SEPARATOR} 编程工具 ${MENU_SEPARATOR}`),
         { name: formatMenuChoice('T. Claude Code 工具', '- Claude Code, ccusage, CCR, CCometixLine'), value: 'tools' },
         { name: formatMenuChoice('E. 基础环境检测', '- Git, PowerShell, Node.js, Python, pip, pnpm, uv, VS Code'), value: 'environment' },

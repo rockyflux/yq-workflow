@@ -1,7 +1,7 @@
 import { homedir } from 'node:os'
 import { join, resolve, sep } from 'node:path'
 import fs from 'fs-extra'
-import { getAgentSkillsDir, getCodexDir } from './installer'
+import { getAgentSkillsDir, getCodexDir, getKiroSkillsDir } from './installer'
 
 export type HelpRootId =
   | 'agents'
@@ -9,6 +9,7 @@ export type HelpRootId =
   | 'codex'
   | 'cursor'
   | 'gemini'
+  | 'kiro'
   | 'openclaw'
   | 'qoder'
   | 'trae'
@@ -33,6 +34,7 @@ export function getHelpRootDefinitions(): HelpRootDefinition[] {
     { id: 'codex', label: '.codex/skills', path: join(getCodexDir(), 'skills') },
     { id: 'cursor', label: '.cursor/skills', path: join(homedir(), '.cursor', 'skills') },
     { id: 'gemini', label: '.gemini/skills', path: join(homedir(), '.gemini', 'skills') },
+    { id: 'kiro', label: '.kiro/skills', path: getKiroSkillsDir() },
     { id: 'openclaw', label: '.openclaw/skills', path: join(homedir(), '.openclaw', 'skills') },
     { id: 'qoder', label: '.qoder/skills', path: join(homedir(), '.qoder', 'skills') },
     { id: 'trae', label: '.trae/skills', path: join(homedir(), '.trae', 'skills') },

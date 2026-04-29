@@ -2,8 +2,8 @@ import ansis from 'ansis'
 import inquirer from 'inquirer'
 import { COMMON_HELP_COMMANDS, HELP_COMMAND_HINTS } from './help-commands'
 import { closeHelpWebServer, getActiveHelpWebState, launchHelpWebDetached } from './help-web'
-import { SKILLS_SH_URL } from './menu-constants'
-import { promptMenuList } from './menu-helpers'
+import { SKILLS_MANAGE_URL, SKILLS_SH_URL } from './menu-constants'
+import { openExternalUrl, promptMenuList } from './menu-helpers'
 import { getAgentSkillsDir, listAgentSkillDirectories } from '../utils/installer'
 
 export function printSkillsStorageNotice(): void {
@@ -54,6 +54,7 @@ export async function configSkills(): Promise<void> {
       choices: [
         { name: '1. 本地网页版 Skills', value: 'web' },
         { name: '2. 查看本地 Skills 目录', value: 'dirs' },
+        { name: '3. 桌面软件管理 Skills', value: 'desktop-skills' },
         { name: 'B. 返回', value: 'back' },
       ],
     }])
@@ -92,6 +93,16 @@ export async function configSkills(): Promise<void> {
     }
     else if (action === 'dirs') {
       await showAgentSkillsDirectories()
+    }
+    else if (action === 'desktop-skills') {
+      console.log()
+      if (await openExternalUrl(SKILLS_MANAGE_URL)) {
+        console.log(ansis.green('  已尝试打开 Skills Manage 项目页'))
+      }
+      else {
+        console.log(ansis.yellow(`  未能自动打开浏览器，请手动访问 ${SKILLS_MANAGE_URL}`))
+      }
+      console.log()
     }
 
     await inquirer.prompt([{

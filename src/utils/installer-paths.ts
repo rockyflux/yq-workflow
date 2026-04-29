@@ -20,6 +20,14 @@ export function getCursorDir(): string {
   return process.env.YQ_CURSOR_DIR || join(homedir(), '.cursor')
 }
 
+export function getKiroDir(): string {
+  return process.env.YQ_KIRO_DIR || join(homedir(), '.kiro')
+}
+
+export function getKiroSkillsDir(): string {
+  return join(getKiroDir(), 'skills')
+}
+
 export async function listAgentSkillDirectories(rootDir = getAgentSkillsDir()): Promise<AgentSkillDirectory[]> {
   if (!(await fs.pathExists(rootDir))) {
     return []

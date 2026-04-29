@@ -28,7 +28,7 @@ features:
     details: 'YQ 自身定位为 AI 编程工具助手，Claude Code、Codex 等只是下层可接入的具体工具，心智模型更清楚。'
   - icon: '2'
     title: '命令、提示词、技能一起装'
-    details: '会把 `/yq:*` 命令文件、Claude 提示词、规则和技能安装到标准目录，并同步镜像到 `~/.agents/skills/`。'
+    details: '会把 `/yq:*` 命令文件、Claude 提示词、规则和技能安装到标准目录，并同步镜像到 `~/.agents/skills/` 与 `~/.kiro/skills/`。'
   - icon: '3'
     title: '保留结构化交付能力'
     details: '支持 `plan / execute / workflow / spec-* / team-*` 等工作流，让需求澄清、计划、实施、验证和交付保持连贯。'

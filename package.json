@@ -1,6 +1,6 @@
 {
   "name": "yq-workflow",
-  "version": "1.0.6",
+  "version": "1.0.9",
   "description": "YQ AI coding toolkit for workflows, prompts, skills, MCP, and coding tool setup",
   "type": "module",
   "packageManager": "pnpm@10.17.1",
@@ -26,9 +26,7 @@
   "files": [
     "bin/yq.mjs",
     "dist",
-    "templates/AGENTS.md",
-    "templates/CLAUDE.md",
-    "templates/guidelines.mdc",
+    "templates/steering/",
     "templates/prompts/",
     "templates/prompts/claude/",
     "templates/output-styles/",

@@ -192,12 +192,23 @@ export const AI_ACCOUNT_MANAGEMENT_PACKAGES: ManagedPackage[] = [
   },
    {
     id: 'makerich-club-refill',
-    label: '账号购买',
+    label: '账号购买 1 ',
     description: '支持ChatGPT Plus,Gemini Pro等，',
     accountCategory: 'provider',
     installType: 'external-link',
     openDirectly: true,
     externalUrl: 'https://makerich.club/',
+    externalActionText: '打开网页',
+    statusHint: '供应商网页',
+  },
+  {
+    id: 'wafase-refill',
+    label: '账号购买 2',
+    description: '支持Cursor,ChatGPT Plus,Gemini Pro等，',
+    accountCategory: 'provider',
+    installType: 'external-link',
+    openDirectly: true,
+    externalUrl: 'https://wafase.com/',
     externalActionText: '打开网页',
     statusHint: '供应商网页',
   },
@@ -209,6 +220,17 @@ export const AI_ACCOUNT_MANAGEMENT_PACKAGES: ManagedPackage[] = [
     installType: 'external-link',
     openDirectly: true,
     externalUrl: 'https://apis.you/catalog',
+    externalActionText: '打开网页',
+    statusHint: '供应商网页',
+  },
+  {
+    id: 'gpt-webfree-refill',
+    label: '网页版ChatGPT Plus',
+    description: '免费不限量使用',
+    accountCategory: 'provider',
+    installType: 'external-link',
+    openDirectly: true,
+    externalUrl: 'https://chat.sharedchat.cc/',
     externalActionText: '打开网页',
     statusHint: '供应商网页',
   },
@@ -308,4 +330,5 @@ export const MENU_RESOURCES = [
 
 export const HEADER_INNER_WIDTH = 60
 export const SKILLS_SH_URL = 'https://skills.sh/'
+export const SKILLS_MANAGE_URL = 'https://github.com/iamzhihuix/skills-manage'
 export const MENU_SEPARATOR = '----------'

@@ -327,7 +327,7 @@ export function getHotPromptImportSource(profileId: PromptProfileId): { label: s
 
 function getProfileIdFromEnv(): PromptProfileId | null {
   const profileId = process.env.YQ_PROMPT_WEB_PROFILE_ID
-  if (profileId === 'claude' || profileId === 'codex' || profileId === 'gemini' || profileId === 'cursor') {
+  if (profileId === 'claude' || profileId === 'codex' || profileId === 'gemini' || profileId === 'cursor' || profileId === 'kiro') {
     return profileId
   }
   return null
@@ -571,10 +571,10 @@ function renderPromptAppHtml(): string {
       <aside class="sidebar">
         <div class="brand">
           <h1>提示词配置</h1>
-          <p>集中管理 Claude、Codex、Gemini、Cursor 的全局提示词文件。每次保存都会先生成对应的备份目录，例如 <code>CLAUDE-backup</code>、<code>AGENTS-backup</code>、<code>guidelines-backup</code>，历史版本可以随时恢复。</p>
+          <p>集中管理 Claude、Codex、Gemini、Cursor、Kiro 的全局提示词文件。每次保存都会先生成对应的备份目录，例如 <code>CLAUDE-backup</code>、<code>AGENTS-backup</code>、<code>guidelines-backup</code>、<code>kiro-backup</code>，历史版本可以随时恢复。</p>
         </div>
         <div id="nav" class="nav"></div>
-        <div class="tip">右侧保存会先弹出确认，再自动把当前版本备份到对应目录，例如 <code>CLAUDE-backup</code>、<code>AGENTS-backup</code>、<code>guidelines-backup</code>。恢复历史时，也会先备份当前版本。</div>
+        <div class="tip">右侧保存会先弹出确认，再自动把当前版本备份到对应目录，例如 <code>CLAUDE-backup</code>、<code>AGENTS-backup</code>、<code>guidelines-backup</code>、<code>kiro-backup</code>。恢复历史时，也会先备份当前版本。</div>
         <div class="meta-list">
           <div class="meta-item"><b>当前文件</b><code id="currentFilePath">-</code></div>
           <div class="meta-item"><b>最近保存</b><code id="currentModifiedAt">-</code></div>

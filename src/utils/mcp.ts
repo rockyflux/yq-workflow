@@ -2,7 +2,7 @@ import { homedir } from 'node:os'
 import { basename, dirname, join } from 'pathe'
 import fs from 'fs-extra'
 import { parse, stringify } from 'smol-toml'
-import { getCodexDir } from './installer-paths'
+import { getCodexDir, getCursorDir, getKiroDir } from './installer-paths'
 import { getMcpCommand, isWindows } from './platform'
 
 export interface McpServerConfig {
@@ -24,7 +24,7 @@ export interface ClaudeCodeConfig {
   [key: string]: any
 }
 
-export type McpClientId = 'claude' | 'codex' | 'gemini'
+export type McpClientId = 'claude' | 'codex' | 'gemini' | 'cursor' | 'kiro'
 
 type McpConfigDocument = Record<string, any>
 
@@ -47,11 +47,21 @@ export function getGeminiMcpConfigPath(): string {
   return process.env.YQ_GEMINI_SETTINGS_PATH || join(homedir(), '.gemini', 'settings.json')
 }
 
+export function getCursorMcpConfigPath(): string {
+  return process.env.YQ_CURSOR_MCP_PATH || join(getCursorDir(), 'mcp.json')
+}
+
+export function getKiroMcpConfigPath(): string {
+  return process.env.YQ_KIRO_MCP_PATH || join(getKiroDir(), 'settings', 'mcp.json')
+}
+
 export function getMcpClientDefinitions(): McpClientDefinition[] {
   return [
     { id: 'claude', label: 'Claude', configPath: getClaudeCodeConfigPath(), format: 'json' },
     { id: 'codex', label: 'Codex', configPath: getCodexMcpConfigPath(), format: 'toml' },
     { id: 'gemini', label: 'Gemini', configPath: getGeminiMcpConfigPath(), format: 'json' },
+    { id: 'cursor', label: 'Cursor', configPath: getCursorMcpConfigPath(), format: 'json' },
+    { id: 'kiro', label: 'Kiro', configPath: getKiroMcpConfigPath(), format: 'json' },
   ]
 }
 

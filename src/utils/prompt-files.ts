@@ -1,9 +1,9 @@
 import { basename, dirname, extname, join } from 'pathe'
 import fs from 'fs-extra'
-import { getCodexDir, getCursorDir } from './installer-paths'
+import { getCodexDir, getCursorDir, getKiroDir } from './installer-paths'
 import { homedir } from 'node:os'
 
-export type PromptProfileId = 'claude' | 'codex' | 'gemini' | 'cursor'
+export type PromptProfileId = 'claude' | 'codex' | 'gemini' | 'cursor' | 'kiro'
 
 export type PromptProfileDefinition = {
   id: PromptProfileId
@@ -44,6 +44,12 @@ export function getPromptProfileDefinitions(): PromptProfileDefinition[] {
       label: 'Cursor 提示词',
       description: '编辑 Cursor 全局规则文件',
       path: join(getCursorDir(), 'rules', 'guidelines.mdc'),
+    },
+    {
+      id: 'kiro',
+      label: 'Kiro 提示词',
+      description: '编辑 Kiro steering 提示词',
+      path: join(getKiroDir(), 'steering', 'kiro.md'),
     },
   ]
 }
