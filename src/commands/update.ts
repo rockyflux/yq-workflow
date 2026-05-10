@@ -5,6 +5,7 @@ import inquirer from 'inquirer'
 import ora from 'ora'
 import { checkForUpdates, compareVersions } from '../utils/version'
 import { readCcgConfig } from '../utils/config'
+import { detectRuntimeSource } from '../utils/runtime-source'
 
 const execAsync = promisify(exec)
 
@@ -19,7 +20,10 @@ export async function update(): Promise<void> {
     const { hasUpdate, currentVersion, latestVersion } = await checkForUpdates()
     const config = await readCcgConfig()
     const localVersion = config?.general?.version || '0.0.0'
+    const runtimeSource = detectRuntimeSource()
     const needsWorkflowUpdate = compareVersions(currentVersion, localVersion) > 0
+    const isCliOlderThanLocalWorkflow = compareVersions(currentVersion, localVersion) < 0
+    const isLocalWorkflowLatest = latestVersion ? compareVersions(latestVersion, localVersion) === 0 : false
     spinner.stop()
 
     if (!latestVersion) {
@@ -33,6 +37,16 @@ export async function update(): Promise<void> {
       console.log(`本地工作流: ${ansis.gray(`v${localVersion}`)}`)
     }
     console.log()
+
+    if (isCliOlderThanLocalWorkflow && isLocalWorkflowLatest) {
+      console.log(ansis.yellow(`检测到当前运行的是较旧 CLI 入口（来源：${runtimeSource.label}，当前 v${currentVersion}，本地工作流 v${localVersion}）。`))
+      console.log(ansis.gray('这时无需重装工作流，请改用 npx --yes yq-workflow@latest，或升级全局 yq-workflow 后重试。'))
+      if (runtimeSource.path) {
+        console.log(ansis.gray(`当前脚本路径: ${runtimeSource.path}`))
+      }
+      console.log()
+      return
+    }
 
     const message = hasUpdate
       ? `发现新版本 v${latestVersion}，是否更新？`

@@ -7,6 +7,7 @@ import { buildDate } from '../generated/build-info'
 import { collectSkills, getAgentSkillsDir } from '../utils/installer'
 import { readCcgConfig } from '../utils/config'
 import { PACKAGE_ROOT } from '../utils/installer-template'
+import { detectRuntimeSource } from '../utils/runtime-source'
 import { compareVersions } from '../utils/version'
 
 const MENU_ANNOUNCEMENT_URL = 'https://plainraw.com/raw/7e7659f4e301'
@@ -16,8 +17,9 @@ type InstallStatus = {
   isInstalled: boolean
   installedVersion: string | null
   currentVersion: string
-  needsUpdate: boolean
-  isCurrentNewer: boolean
+  hasVersionMismatch: boolean
+  isWorkflowOutdated: boolean
+  isCliOutdated: boolean
 }
 
 type InstalledSkill = {
@@ -105,19 +107,41 @@ async function countInstalledSkills(): Promise<number> {
   return workflowSkills.length + yqSkills.length + baseSkills.length + superpowersSkills.length + externalAgentSkills.length
 }
 
+export function getVersionStatus(currentVersion: string, installedVersion: string | null): Pick<InstallStatus, 'hasVersionMismatch' | 'isWorkflowOutdated' | 'isCliOutdated'> {
+  if (!installedVersion) {
+    return {
+      hasVersionMismatch: false,
+      isWorkflowOutdated: false,
+      isCliOutdated: false,
+    }
+  }
+
+  const comparison = compareVersions(currentVersion, installedVersion)
+
+  return {
+    hasVersionMismatch: comparison !== 0,
+    isWorkflowOutdated: comparison > 0,
+    isCliOutdated: comparison < 0,
+  }
+}
+
 async function getInstallStatus(commandCount: number): Promise<InstallStatus> {
   const config = await readCcgConfig()
   const installedVersion = config?.general?.version || null
   const isInstalled = Boolean(installedVersion) && commandCount > 0
-  const needsUpdate = installedVersion !== null && compareVersions(version, installedVersion) !== 0
-  const isCurrentNewer = installedVersion !== null && compareVersions(version, installedVersion) > 0
+  const {
+    hasVersionMismatch,
+    isWorkflowOutdated,
+    isCliOutdated,
+  } = getVersionStatus(version, installedVersion)
 
   return {
     isInstalled,
     installedVersion,
     currentVersion: version,
-    needsUpdate,
-    isCurrentNewer,
+    hasVersionMismatch,
+    isWorkflowOutdated,
+    isCliOutdated,
   }
 }
 
@@ -130,7 +154,7 @@ function printInstallStatus(status: InstallStatus): void {
     return
   }
 
-  if (!status.needsUpdate) {
+  if (!status.hasVersionMismatch) {
     console.log(ansis.green(`  当前是最新安装版本: v${status.currentVersion}`))
     console.log()
     return
@@ -138,9 +162,9 @@ function printInstallStatus(status: InstallStatus): void {
 
   console.log(`  已安装版本: ${ansis.yellow(`v${installedVersion}`)}`)
 
-  const reminder = status.isCurrentNewer
-    ? `检测到已安装版本较旧，当前启动版本为 v${status.currentVersion}，可直接在主菜单选择更新`
-    : `检测到当前启动版本较旧，已安装版本为 v${installedVersion}，建议更新 CLI 或使用较新的 yq-workflow 版本`
+  const reminder = status.isWorkflowOutdated
+    ? `检测到已安装工作流较旧，当前启动版本为 v${status.currentVersion}，可直接在主菜单选择更新`
+    : `检测到当前运行的是较旧 CLI 入口（来源：${detectRuntimeSource().label}，当前 v${status.currentVersion}，本地工作流 v${installedVersion}）。请改用 npx --yes yq-workflow@latest，或升级全局 yq-workflow 后重试`
 
   console.log(ansis.yellow(`  更新提醒: ${reminder}`))
   console.log()

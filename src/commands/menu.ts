@@ -159,7 +159,7 @@ export async function showMainMenu(): Promise<void> {
 
   while (true) {
     const installStatus = await renderMenuStatus(HEADER_INNER_WIDTH, MENU_RESOURCES, announcement)
-    const updateMenuChoice = installStatus.isCurrentNewer
+    const updateMenuChoice = installStatus.isWorkflowOutdated
       ? `${ansis.yellow('2. 更新工作流')}  ${ansis.yellowBright('-  更新到最新版本')} ${ansis.bgYellow.black(' 有版本更新 ')}`
       : formatMenuChoice('2. 更新工作流', '- 更新到最新版本')
 
