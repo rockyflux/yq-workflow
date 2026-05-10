@@ -66,12 +66,12 @@ export default defineConfig({
       },
     ],
     editLink: {
-      pattern: 'https://github.com/rockyflux/yq-workflow/edit/main/docs/:path',
+      pattern: 'https://github.com/rockyflux/yq-workflow/edit/master/docs/:path',
       text: '在 GitHub 上编辑此页',
     },
     footer: {
       message: '基于 MIT 许可发布',
-      copyright: 'Copyright © 2026-present yunqu Contributors',
+      copyright: 'Copyright © 2026-present rocky Contributors',
     },
     docFooter: {
       prev: '上一页',
