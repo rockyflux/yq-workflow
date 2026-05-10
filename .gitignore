@@ -44,6 +44,7 @@ ceshi/
 .spec-workflow/
 openspec/
 AGENTS.md
+!templates/steering/AGENTS.md
 
 # VitePress build output
 docs/.vitepress/.temp/
@@ -62,3 +63,4 @@ FINAL_VERIFICATION.md
 
 # OpenMemory - IDE/Assistant specific rules
 CLAUDE.md
+!templates/steering/CLAUDE.md

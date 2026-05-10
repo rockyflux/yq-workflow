@@ -1,10 +1,7 @@
 import ansis from 'ansis'
 import inquirer from 'inquirer'
 import ora from 'ora'
-import {
-  detectBaseEnvironmentToolStatuses,
-  SCIENTIFIC_INTERNET_GUIDE_URL,
-} from '../utils/installer'
+import { detectBaseEnvironmentToolStatuses } from '../utils/installer'
 import type { BaseEnvironmentInstallAction, BaseEnvironmentToolStatus } from '../utils/installer'
 import { openExternalUrl, promptMenuList, runInteractiveCommand } from './menu-helpers'
 
@@ -42,8 +39,7 @@ function printBaseEnvironmentStatusLines(statuses: BaseEnvironmentToolStatus[]):
 
   console.log()
   console.log(ansis.cyan.bold('  基础环境检测'))
-  console.log(ansis.gray('  检测 Git、PowerShell、Node.js、Python、pip、pnpm、uv、VS Code，并提供安装入口'))
-  console.log(ansis.gray('  菜单额外提供“科学上网”快捷入口，可直接打开相关文章'))
+  console.log(ansis.gray('  检测 Git、PowerShell、Node.js、Python、pip、pnpm、uv、ripgrep (rg)、VS Code，并提供安装入口'))
   console.log()
   console.log(ansis.gray(separator))
   console.log(ansis.cyan(header))
@@ -168,7 +164,6 @@ export async function runBaseEnvironmentMenu(): Promise<void> {
           name: formatBaseEnvironmentChoice(item),
           value: item.id,
         })),
-        { name: '打开网站：科学上网推荐列表', value: 'scientific-internet' },
         { name: '重新检测版本', value: 'refresh' },
         { name: '返回', value: 'back' },
       ],
@@ -183,19 +178,6 @@ export async function runBaseEnvironmentMenu(): Promise<void> {
     }
 
     if (target === 'refresh') {
-      continue
-    }
-
-    if (target === 'scientific-internet') {
-      const opened = await openExternalUrl(SCIENTIFIC_INTERNET_GUIDE_URL)
-      console.log()
-      if (opened) {
-        console.log(ansis.green('  已尝试打开科学上网推荐列表'))
-      }
-      else {
-        console.log(ansis.yellow(`  未能自动打开浏览器，请手动访问 ${SCIENTIFIC_INTERNET_GUIDE_URL}`))
-      }
-      console.log()
       continue
     }
 

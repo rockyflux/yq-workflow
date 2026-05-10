@@ -19,6 +19,8 @@ export type PromptBackupEntry = {
   modifiedAt: string
 }
 
+const MAX_PROMPT_BACKUPS = 10
+
 export function getPromptProfileDefinitions(): PromptProfileDefinition[] {
   return [
     {
@@ -81,6 +83,7 @@ export async function backupFileIfExists(filePath: string, now = new Date()): Pr
   const backupPath = getTimestampedBackupPath(filePath, now)
   await fs.ensureDir(getPromptBackupDir(filePath))
   await fs.copy(filePath, backupPath, { overwrite: false, errorOnExist: true })
+  await prunePromptBackups(filePath)
   return backupPath
 }
 
@@ -113,6 +116,13 @@ export async function listPromptBackupEntries(filePath: string): Promise<PromptB
   return backups
     .filter((entry): entry is PromptBackupEntry => entry !== null)
     .sort((a, b) => b.fileName.localeCompare(a.fileName))
+}
+
+async function prunePromptBackups(filePath: string, maxBackups = MAX_PROMPT_BACKUPS): Promise<void> {
+  const backups = await listPromptBackupEntries(filePath)
+  const expiredBackups = backups.slice(Math.max(maxBackups, 0))
+
+  await Promise.all(expiredBackups.map(async backup => fs.remove(backup.path)))
 }
 
 export async function readPromptFile(filePath: string): Promise<string> {

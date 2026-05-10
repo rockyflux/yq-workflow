@@ -1,3 +1,5 @@
+import { SCIENTIFIC_INTERNET_GUIDE_URL } from '../utils/installer'
+
 export type MenuAction =
   | 'init'
   | 'update'
@@ -70,6 +72,18 @@ export const CODING_TOOL_PACKAGES: ManagedPackage[] = [
     category: 'cli',
     description: 'OpenCode.ai 命令行工具',
   },
+   {
+    id: 'aionui',
+    label: 'AionUi',
+    category: 'desktop',
+    description: '自动识别你电脑上的 Claude Code、Codex、Gemini CLI 等 20+ 款 CLI',
+    installType: 'external-link',
+    openDirectly: true,
+    externalUrl: 'https://www.aionui.com/zh/',
+    externalActionText: '打开下载页',
+    tutorialUrl: 'https://www.aionui.com/zh/',
+    tutorialActionText: '打开项目主页',
+  },
   {
     id: 'mossx-client',
     label: 'MossX 客户端',
@@ -116,7 +130,7 @@ export const AI_ACCOUNT_MANAGEMENT_PACKAGES: ManagedPackage[] = [
   {
     id: 'cc-switch',
     label: 'cc-switch',
-    description: 'Claude Code / Codex / Gemini 等模型 API 切换与配置工具',
+    description: '本地账号切换工具，适合管理 Claude Code、Codex、Gemini CLI 等配置',
     accountCategory: 'client',
     installType: 'external-link',
     openDirectly: true,
@@ -127,7 +141,7 @@ export const AI_ACCOUNT_MANAGEMENT_PACKAGES: ManagedPackage[] = [
   {
     id: 'cockpit-tools',
     label: 'Cockpit Tools',
-    description: '通用 AI IDE 账号管理工具，支持多账号多实例并行运行、一键切号',
+    description: '多账号管理客户端，支持多实例运行与一键切换常见 AI 编程工具账号',
     accountCategory: 'client',
     installType: 'external-link',
     openDirectly: true,
@@ -136,20 +150,9 @@ export const AI_ACCOUNT_MANAGEMENT_PACKAGES: ManagedPackage[] = [
     statusHint: 'GitHub 项目页',
   },
   {
-    id: 'cli-proxy-api',
-    label: 'CLIProxyAPI',
-    description: '反代 / 聚合各渠道模型，对外提供统一 API Endpoint 与 Key',
-    accountCategory: 'client',
-    installType: 'external-link',
-    openDirectly: true,
-    externalUrl: 'https://github.com/router-for-me/CLIProxyAPI',
-    externalActionText: '打开项目主页',
-    statusHint: 'GitHub 项目页',
-  },
-  {
     id: 'cherry-studio',
     label: 'Cherry Studio',
-    description: '跨平台 AI 对话客户端',
+    description: '跨平台 AI 客户端，适合统一管理和测试多个模型账号',
     accountCategory: 'client',
     installType: 'external-link',
     openDirectly: true,
@@ -158,9 +161,31 @@ export const AI_ACCOUNT_MANAGEMENT_PACKAGES: ManagedPackage[] = [
     statusHint: '官方网站',
   },
   {
+    id: 'scientific-internet-guide',
+    label: '科学上网推荐列表',
+    description: '常用科学上网工具与相关文章导航页；地址：www.ermao.net/posts/vpn',
+    accountCategory: 'provider',
+    installType: 'external-link',
+    openDirectly: true,
+    externalUrl: SCIENTIFIC_INTERNET_GUIDE_URL,
+    externalActionText: '打开网页',
+    statusHint: '推荐列表',
+  },
+  {
+    id: 'cli-proxy-api',
+    label: 'CLIProxyAPI',
+    description: '统一代理与中转入口，适合给 Claude、OpenAI、Gemini 等提供兼容 API',
+    accountCategory: 'client',
+    installType: 'external-link',
+    openDirectly: true,
+    externalUrl: 'https://github.com/router-for-me/CLIProxyAPI',
+    externalActionText: '打开项目主页',
+    statusHint: 'GitHub 项目页',
+  },
+  {
     id: 'sub2api-crs2',
     label: 'Sub2API-CRS2',
-    description: '一站式开源中转服务，统一接入 Claude、OpenAI、Gemini、Antigravity 订阅',
+    description: '开源中转服务，统一接入 Claude、OpenAI、Gemini 等订阅与接口',
     accountCategory: 'client',
     installType: 'external-link',
     openDirectly: true,
@@ -171,7 +196,7 @@ export const AI_ACCOUNT_MANAGEMENT_PACKAGES: ManagedPackage[] = [
   {
     id: 'ldxp-unlimited-refill',
     label: '无限续杯工具 1',
-    description: '支持 Cursor、Kiro，可同时5 台设备在线使用，推荐月卡。',
+    description: '支持 Cursor、Kiro 等，强调多设备在线使用，适合月卡方案；地址：pay.ldxp.cn/shop/xxdlzs',
     accountCategory: 'provider',
     installType: 'external-link',
     openDirectly: true,
@@ -182,7 +207,7 @@ export const AI_ACCOUNT_MANAGEMENT_PACKAGES: ManagedPackage[] = [
   {
     id: 'suiyuee-unlimited-refill',
     label: '无限续杯工具 2',
-    description: '支持 Codex、Cursor、Windsurf、Kiro，限制频繁续杯，推荐月卡。',
+    description: '支持 Codex、Cursor、Windsurf、Kiro 等，适合常规续杯场景；地址：suiyuee.top/shop',
     accountCategory: 'provider',
     installType: 'external-link',
     openDirectly: true,
@@ -190,10 +215,10 @@ export const AI_ACCOUNT_MANAGEMENT_PACKAGES: ManagedPackage[] = [
     externalActionText: '打开网页',
     statusHint: '供应商网页',
   },
-   {
+  {
     id: 'makerich-club-refill',
-    label: '账号购买 1 ',
-    description: '支持ChatGPT Plus,Gemini Pro等，',
+    label: '账号购买 1',
+    description: '提供 ChatGPT Plus、Gemini Pro 等常见账号购买入口；地址：makerich.club',
     accountCategory: 'provider',
     installType: 'external-link',
     openDirectly: true,
@@ -204,7 +229,7 @@ export const AI_ACCOUNT_MANAGEMENT_PACKAGES: ManagedPackage[] = [
   {
     id: 'wafase-refill',
     label: '账号购买 2',
-    description: '支持Cursor,ChatGPT Plus,Gemini Pro等，',
+    description: '提供 Cursor、ChatGPT Plus、Gemini Pro 等账号购买入口；地址：wafase.com',
     accountCategory: 'provider',
     installType: 'external-link',
     openDirectly: true,
@@ -214,8 +239,8 @@ export const AI_ACCOUNT_MANAGEMENT_PACKAGES: ManagedPackage[] = [
   },
   {
     id: 'apis-you-refill',
-    label: 'AI中转套餐大全',
-    description: 'Claude Code中转站',
+    label: 'AI 中转套餐大全',
+    description: '聚合多种中转套餐，适合按目录筛选 Claude Code 相关方案；地址：apis.you/catalog',
     accountCategory: 'provider',
     installType: 'external-link',
     openDirectly: true,
@@ -225,12 +250,23 @@ export const AI_ACCOUNT_MANAGEMENT_PACKAGES: ManagedPackage[] = [
   },
   {
     id: 'gpt-webfree-refill',
-    label: '网页版ChatGPT Plus',
-    description: '免费不限量使用',
+    label: '免费 Web Chat 1',
+    description: '基于 chat.sharedchat.cc 的免费网页入口，可直接在线使用；地址：chat.sharedchat.cc',
     accountCategory: 'provider',
     installType: 'external-link',
     openDirectly: true,
     externalUrl: 'https://chat.sharedchat.cc/',
+    externalActionText: '打开网页',
+    statusHint: '供应商网页',
+  },
+  {
+    id: 'halo-webui-free',
+    label: '免费 Web Chat 2',
+    description: '基于 chat.oaichat.cc 的 Halo WebUI 免费入口，可直接在线使用；地址：chat.oaichat.cc',
+    accountCategory: 'provider',
+    installType: 'external-link',
+    openDirectly: true,
+    externalUrl: 'https://chat.oaichat.cc/',
     externalActionText: '打开网页',
     statusHint: '供应商网页',
   },
@@ -324,7 +360,7 @@ export const MENU_RESOURCES = [
   },
   {
     label: '项目地址',
-    url: 'http://172.16.68.178:8090/vb-coding/yq-workflow',
+    url: 'https://github.com/rockyflux/yq-workflow',
   },
 ] as const
 

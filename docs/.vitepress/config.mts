@@ -12,6 +12,15 @@ function resolveBase() {
     }
   }
 
+  const githubRepository = process.env.GITHUB_REPOSITORY
+  if (githubRepository) {
+    const [, repositoryName = ''] = githubRepository.split('/')
+    if (repositoryName.endsWith('.github.io'))
+      return '/'
+    if (repositoryName)
+      return `/${repositoryName}/`
+  }
+
   return process.env.VITEPRESS_BASE || '/yq-workflow/'
 }
 
@@ -26,7 +35,7 @@ export default defineConfig({
   cleanUrls: true,
 
   head: [
-    ['link', { rel: 'icon', type: 'image/svg+xml', href: `${base}logo.svg` }],
+    ['link', { rel: 'icon', type: 'image/png', href: `${base}logo.png` }],
   ],
 
   themeConfig: {
@@ -57,7 +66,7 @@ export default defineConfig({
       },
     ],
     editLink: {
-      pattern: 'http://172.16.68.178:8090/vb-coding/yq-workflow/edit/main/docs/:path',
+      pattern: 'https://github.com/rockyflux/yq-workflow/edit/main/docs/:path',
       text: '在 GitHub 上编辑此页',
     },
     footer: {
@@ -78,7 +87,7 @@ export default defineConfig({
     sidebarMenuLabel: '菜单',
     darkModeSwitchLabel: '主题',
     socialLinks: [
-      { icon: 'github', link: 'http://172.16.68.178:8090/vb-coding/yq-workflow' },
+      { icon: 'github', link: 'https://github.com/rockyflux/yq-workflow' },
     ],
     search: {
       provider: 'local',

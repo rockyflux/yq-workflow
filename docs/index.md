@@ -3,45 +3,82 @@ layout: home
 
 hero:
   name: 'YQ-workflow'
-  text: 'AI编程工具助手'
-  tagline: '安装命令包、提示词、技能、规则和常用工具入口，保持实现透明，不依赖黑盒包装。'
+  text: 'AI 编程工具工作台'
+  tagline: '把工作流命令、全局提示词、Skills、MCP 和常用 AI 编程工具入口整理到一个可维护的本地控制台里。'
   image:
-    src: /logo.svg
+    src: /logo.png
     alt: YQ
   actions:
     - theme: brand
-      text: '三分钟上手'
+      text: '快速开始'
       link: /guide/getting-started
     - theme: alt
-      text: '查看命令'
-      link: /guide/commands
-    - theme: alt
-      text: '查看技能'
-      link: /guide/skills
+      text: '配置说明'
+      link: /guide/configuration
     - theme: alt
       text: 'GitHub'
-      link: http://172.16.68.178:8090/vb-coding/yq-workflow
+      link: https://github.com/rockyflux/yq-workflow
 
 features:
   - icon: '1'
-    title: '工具定位更清晰'
-    details: 'YQ 自身定位为 AI 编程工具助手，Claude Code、Codex 等只是下层可接入的具体工具，心智模型更清楚。'
+    title: '统一安装工作流资产'
+    details: '初始化后会把 `/yq:*` 命令、提示词模板、规则文件和 Skills 安装到各自的标准目录，减少手工分散配置。'
   - icon: '2'
-    title: '命令、提示词、技能一起装'
-    details: '会把 `/yq:*` 命令文件、Claude 提示词、规则和技能安装到标准目录，并同步镜像到 `~/.agents/skills/` 与 `~/.kiro/skills/`。'
+    title: '主菜单覆盖日常管理'
+    details: '主菜单集中提供安装与更新、提示词配置、Skills 浏览、MCP 配置、基础环境检测、模型使用统计和常用工具入口。'
   - icon: '3'
-    title: '保留结构化交付能力'
-    details: '支持 `plan / execute / workflow / spec-* / team-*` 等工作流，让需求澄清、计划、实施、验证和交付保持连贯。'
+    title: '支持多工具全局提示词'
+    details: '可统一编辑 Claude、Codex、Gemini、Cursor、Kiro 的全局提示词。'
   - icon: '4'
-    title: 'MCP 分类清晰'
-    details: '按必装工具、数据库、Git/版本控制、文件/资源四类配置 MCP，避免历史版本里杂乱的入口设计。'
+    title: 'MCP 配置按客户端拆分'
+    details: '在本地网页里分别管理 Claude、Codex、Gemini、Cursor、Kiro 的 MCP 配置，并保留四类预置模板与 Smithery 搜索入口。'
   - icon: '5'
-    title: '主菜单覆盖常用运维'
-    details: '除了安装和更新工作流，也能在主菜单里打开 API 配置工具下载页、配置 MCP、输出风格，以及统一管理 Claude Code、Codex、Gemini CLI、OpenCode、CCR、CCometixLine。'
+    title: '命令和技能都可落地'
+    details: '内置 29 个 `/yq:*` 命令，并同步 `yq`、`yq-base`、`superpowers` 三组技能镜像到本地目录，方便 Claude Code、Codex、Gemini CLI 等工具复用。'
   - icon: '6'
-    title: '跨平台即装即用'
-    details: '`npx yq-workflow` 即可启动，支持 macOS、Linux、Windows，默认中文界面。'
+    title: '工具入口与检测放在一起'
+    details: '除了 Claude Code、Codex、Gemini CLI、OpenCode 等 CLI，也提供 AionUi、MossX、Codex App、Any Code 等桌面端下载入口与基础环境版本检测。'
 ---
+
+## 这是什么
+
+YQ Workflow 不是新的编程代理，也不是模型路由层。
+
+它更像一个面向 AI Coding 的本地工具工作台，用来整理这些经常分散在不同目录和不同网页里的东西：
+
+- 工作流命令
+- 全局提示词
+- Skills
+- MCP 配置
+- 常用 AI 编程工具入口
+- 基础环境与模型使用统计
+
+## 安装后会管理什么
+
+默认安装会写入这些位置：
+
+```text
+~/.claude/commands/yq/           /yq:* 命令文件
+~/.claude/.yq/prompts/           提示词资产
+~/.claude/skills/yq/             工作流技能
+~/.agents/skills/                技能镜像目录
+~/.kiro/skills/                  Kiro 技能镜像目录
+~/.codex/AGENTS.md               Codex 全局提示词
+~/.claude/CLAUDE.md              Claude 全局提示词
+~/.gemini/GEMINI.md              Gemini 全局提示词
+~/.cursor/rules/guidelines.mdc   Cursor 规则
+~/.kiro/steering/kiro.md         Kiro steering
+```
+
+已有提示词文件会先备份，再写入最新内容。
+
+## 文档怎么读
+
+- 想先装起来：看 [快速开始](/guide/getting-started)
+- 想确认命令入口：看 [命令参考](/guide/commands)
+- 想理解工作流选择：看 [工作流指南](/guide/workflows)
+- 想确认目录、备份和运行时约定：看 [配置说明](/guide/configuration)
+- 想单独管理 Skills 或 MCP：看 [技能说明](/guide/skills) 和 [MCP 配置](/guide/mcp)
 
 <style>
 :root {

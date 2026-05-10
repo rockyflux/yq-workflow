@@ -1,10 +1,20 @@
 # MCP 配置
 
-MCP 工具用于补足 Claude Code 的外部能力。不配也能用，配好之后在查文档、连数据库、看 GitHub、读写文件这些场景会顺手很多。
+MCP 用来补足 AI 编程工具的外部能力。不配也能用，配好之后在查文档、连数据库、看 GitHub、读写文件这些场景会顺手很多。
 
 ```bash
 npx yq-workflow menu  # 选「配置 MCP」
 ```
+
+YQ 会打开一个本地网页，用来分别管理这些客户端的 MCP 配置：
+
+- Claude
+- Codex
+- Gemini
+- Cursor
+- Kiro
+
+页面里保留四类预置模板，也支持搜索、启停、JSON 直编和保存前自动备份。
 
 ## 必装工具 MCP
 
@@ -27,11 +37,22 @@ npx yq-workflow menu  # 选「配置 MCP」
 - **Filesystem** — 本地文件与目录读写、搜索、查看元数据。
 - **Memory** — 本地持久化知识图谱，适合保存结构化记忆和资源线索。
 
-## MCP 同步
+## Smithery 集成
 
-配好 MCP 之后，YQ 会自动把配置写入 Claude Code：
+MCP 配置页里集成了 Smithery：
 
-- `~/.claude.json`
+- 检测本机是否已安装 `@smithery/cli`
+- 支持执行 `npm install -g @smithery/cli@latest`
+- 支持搜索服务器并打开详情页
+- 搜索时可直接复用 `npx -y @smithery/cli@latest`
+
+## 配置会写到哪里
+
+不同客户端会写到各自的配置文件，而不是只写 Claude：
+
+- Claude：`~/.claude.json`
+- Gemini：`~/.gemini/settings.json`
+- 其他客户端按各自本地配置路径管理
 
 ## 出问题了？
 
@@ -39,4 +60,10 @@ npx yq-workflow menu  # 选「配置 MCP」
 npx yq-workflow diagnose-mcp
 ```
 
-这个命令会检查你的 MCP 配置哪里不对。
+这个命令会检查 Claude 侧的 MCP 配置问题。
+
+如果需要自动修复基础问题，还可以运行：
+
+```bash
+npx yq-workflow fix-mcp
+```

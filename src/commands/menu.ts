@@ -178,7 +178,7 @@ export async function showMainMenu(): Promise<void> {
         { name: formatMenuChoice('6. 配置 MCP', '- Claude / Codex / Gemini / Cursor / Kiro 本地网页管理'), value: 'mcp' },
         new inquirer.Separator(`${MENU_SEPARATOR} 编程工具 ${MENU_SEPARATOR}`),
         { name: formatMenuChoice('T. Claude Code 工具', '- Claude Code, ccusage, CCR, CCometixLine'), value: 'tools' },
-        { name: formatMenuChoice('E. 基础环境检测', '- Git, PowerShell, Node.js, Python, pip, pnpm, uv, VS Code'), value: 'environment' },
+        { name: formatMenuChoice('E. 基础环境检测', '- Git, PowerShell, Node.js, Python, pip, pnpm, uv, rg, VS Code'), value: 'environment' },
         { name: formatMenuChoice('C. 安装编程工具', '- CLI 命令行版 / 桌面端 UI'), value: 'coding-tools' },
         { name: formatMenuChoice('I. 模型账号管理', '- 客户端 / 续杯工具'), value: 'ai-accounts' },
         { name: formatMenuChoice('U. 模型使用统计', '- Claude Code / Codex / 网页版统计工具'), value: 'model-usage' },

@@ -3,7 +3,7 @@ import { promisify } from 'node:util'
 
 const execFileAsync = promisify(execFile)
 
-export type BaseEnvironmentToolId = 'git' | 'powershell' | 'nodejs' | 'python' | 'pip' | 'pnpm' | 'uv' | 'vscode'
+export type BaseEnvironmentToolId = 'git' | 'powershell' | 'nodejs' | 'python' | 'pip' | 'pnpm' | 'uv' | 'rg' | 'vscode'
 
 export interface BaseEnvironmentInstallAction {
   id: string
@@ -468,6 +468,34 @@ function getBaseEnvironmentToolDefinitions(): BaseEnvironmentToolDefinition[] {
         ],
       },
       locateCommand: 'uv',
+    },
+    {
+      id: 'rg',
+      label: 'ripgrep',
+      description: '检测 ripgrep 命令行搜索工具并提供下载入口',
+      detect: () => [
+        { command: 'rg', args: ['--version'], label: 'rg', versionPattern: /ripgrep (\d+(?:\.\d+)+)/i },
+      ],
+      getDetail: version => version ? `已检测到 ripgrep ${version}` : '未检测到 ripgrep (rg)',
+      installActions: {
+        win32: [
+          {
+            id: 'open-download',
+            label: '打开 ripgrep 下载页',
+            type: 'link',
+            url: 'https://ripgrep.dev/download/',
+          },
+        ],
+        darwin: [
+          {
+            id: 'open-download',
+            label: '打开 ripgrep 下载页',
+            type: 'link',
+            url: 'https://ripgrep.dev/download/',
+          },
+        ],
+      },
+      locateCommand: 'rg',
     },
     {
       id: 'vscode',

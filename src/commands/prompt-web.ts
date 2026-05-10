@@ -571,10 +571,10 @@ function renderPromptAppHtml(): string {
       <aside class="sidebar">
         <div class="brand">
           <h1>提示词配置</h1>
-          <p>集中管理 Claude、Codex、Gemini、Cursor、Kiro 的全局提示词文件。每次保存都会先生成对应的备份目录，例如 <code>CLAUDE-backup</code>、<code>AGENTS-backup</code>、<code>guidelines-backup</code>、<code>kiro-backup</code>，历史版本可以随时恢复。</p>
+          <p>集中管理 Claude、Codex、Gemini、Cursor、Kiro 的全局提示词文件。每次保存都会先生成对应的备份目录，例如 <code>CLAUDE-backup</code>、<code>AGENTS-backup</code>、<code>guidelines-backup</code>、<code>kiro-backup</code>，历史版本可以随时恢复，每种提示词最多保留最新 10 份。</p>
         </div>
         <div id="nav" class="nav"></div>
-        <div class="tip">右侧保存会先弹出确认，再自动把当前版本备份到对应目录，例如 <code>CLAUDE-backup</code>、<code>AGENTS-backup</code>、<code>guidelines-backup</code>、<code>kiro-backup</code>。恢复历史时，也会先备份当前版本。</div>
+        <div class="tip">右侧保存会先弹出确认，再自动把当前版本备份到对应目录，例如 <code>CLAUDE-backup</code>、<code>AGENTS-backup</code>、<code>guidelines-backup</code>、<code>kiro-backup</code>。恢复历史时，也会先备份当前版本；每种提示词最多保留最新 10 份备份。</div>
         <div class="meta-list">
           <div class="meta-item"><b>当前文件</b><code id="currentFilePath">-</code></div>
           <div class="meta-item"><b>最近保存</b><code id="currentModifiedAt">-</code></div>
@@ -612,7 +612,7 @@ function renderPromptAppHtml(): string {
           <aside class="history-panel">
             <div class="history-head">
               <h3>备份历史</h3>
-              <p>按时间倒序显示。恢复任意版本时，系统会先备份当前内容，再写回所选历史。</p>
+              <p>按时间倒序显示。恢复任意版本时，系统会先备份当前内容，再写回所选历史，并仅保留最新 10 份。</p>
             </div>
             <div id="historyList" class="history-list">
               <div class="empty">暂无备份记录。</div>
