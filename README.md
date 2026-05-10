@@ -60,6 +60,10 @@ YQ Workflow 是一个面向 AI Coding 的本地工具工作台，用来把工作
 npx yq-workflow@latest init
 ```
 
+如果你想先查看发布页、版本信息或 npm 安装入口，可以直接打开：
+
+<https://www.npmjs.com/package/yq-workflow>
+
 安装完成后，或你只是想直接打开主菜单时，运行：
 
 ```bash

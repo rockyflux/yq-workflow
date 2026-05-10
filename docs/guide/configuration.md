@@ -193,6 +193,7 @@ npx yq-workflow config mcp
 ### 项目与参考
 
 - YQ Workflow 项目地址：<https://github.com/rockyflux/yq-workflow>
+- YQ Workflow npm 包：<https://www.npmjs.com/package/yq-workflow>
 - AI 编程实践指南：<https://github.com/rockyflux/ai-guide>
 
 ### Skills 相关

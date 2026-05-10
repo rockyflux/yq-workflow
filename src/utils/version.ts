@@ -100,8 +100,8 @@ export async function getGlobalPackageVersion(packageName: string): Promise<stri
  * @returns 1 if v1 > v2, -1 if v1 < v2, 0 if equal
  */
 export function compareVersions(v1: string, v2: string): number {
-  const parts1 = v1.split('.').map(Number)
-  const parts2 = v2.split('.').map(Number)
+  const parts1 = normalizeVersion(v1)
+  const parts2 = normalizeVersion(v2)
 
   for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
     const num1 = parts1[i] || 0
@@ -114,6 +114,15 @@ export function compareVersions(v1: string, v2: string): number {
   }
 
   return 0
+}
+
+function normalizeVersion(version: string): number[] {
+  return version
+    .trim()
+    .replace(/^[^\d]*/u, '')
+    .split('.')
+    .map(part => Number.parseInt(part.replace(/[^\d].*$/u, ''), 10))
+    .map(part => Number.isFinite(part) ? part : 0)
 }
 
 /**

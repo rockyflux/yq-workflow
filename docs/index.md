@@ -13,6 +13,9 @@ hero:
       text: '快速开始'
       link: /guide/getting-started
     - theme: alt
+      text: 'npm 包'
+      link: https://www.npmjs.com/package/yq-workflow
+    - theme: alt
       text: '配置说明'
       link: /guide/configuration
     - theme: alt
@@ -75,6 +78,7 @@ YQ Workflow 不是新的编程代理，也不是模型路由层。
 ## 文档怎么读
 
 - 想先装起来：看 [快速开始](/guide/getting-started)
+- 想直接看发布页和安装入口：看 [npm 包页面](https://www.npmjs.com/package/yq-workflow)
 - 想确认命令入口：看 [命令参考](/guide/commands)
 - 想理解工作流选择：看 [工作流指南](/guide/workflows)
 - 想确认目录、备份和运行时约定：看 [配置说明](/guide/configuration)

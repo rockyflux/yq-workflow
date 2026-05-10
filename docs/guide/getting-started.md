@@ -27,6 +27,10 @@ YQ 是一个 AI Coding 本地工具工作台，负责把工作流、命令、提
 npx yq-workflow
 ```
 
+如果你想先确认当前发布版本、包说明或 npm 安装入口，可以直接查看：
+
+- npm 包页面：<https://www.npmjs.com/package/yq-workflow>
+
 默认使用简体中文，不再弹出语言选择。
 初始化默认走轻量安装路径，不再单独询问 `liteMode`。
 
@@ -72,6 +76,7 @@ npx yq-workflow menu
 
 ## 下一步
 
+- [npm 包页面](https://www.npmjs.com/package/yq-workflow)：查看最新发布信息与安装入口
 - [命令参考](/guide/commands)：看 29 个命令分别做什么
 - [工作流指南](/guide/workflows)：按任务类型选择合适的工作流
 - [MCP 配置](/guide/mcp)：补齐外部能力
