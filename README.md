@@ -137,7 +137,7 @@ npx yq-workflow update
 
 ### 6. 想找模型账号或科学上网入口
 
-进入 `AI 账号管理`，可以按客户端、账号 / token 供应商分组打开常用网页入口，也可以直接打开科学上网推荐列表。
+进入 `AI 账号管理`，可以按客户端、账号 / token 供应商、免费 Web Chat 分组打开常用网页入口，也可以直接打开科学上网推荐列表。
 
 ## 常用命令
 
@@ -151,6 +151,8 @@ npx yq-workflow config skills
 npx yq-workflow config mcp
 npx yq-workflow config prompt
 ```
+
+其中 `npx yq-workflow help` 会先显示当前常用命令与提示，然后立即尝试打开文档站点 <https://rockyflux.github.io/yq-workflow/>。
 
 ## 当前主菜单会管理的工具
 

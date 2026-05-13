@@ -1,6 +1,6 @@
 import ansis from 'ansis'
 import inquirer from 'inquirer'
-import { COMMON_HELP_COMMANDS, HELP_COMMAND_HINTS } from './help-commands'
+import { COMMON_HELP_COMMANDS, HELP_COMMAND_HINTS, HELP_OVERVIEW_URL } from './help-commands'
 import { closeHelpWebServer, getActiveHelpWebState, launchHelpWebDetached } from './help-web'
 import { SKILLS_MANAGE_URL, SKILLS_SH_URL } from './menu-constants'
 import { openExternalUrl, promptMenuList } from './menu-helpers'
@@ -124,6 +124,14 @@ export async function showHelp(): Promise<void> {
   console.log(ansis.cyan('  提示'))
   for (const hint of HELP_COMMAND_HINTS) {
     console.log(ansis.gray(`  ${hint}`))
+  }
+  console.log()
+
+  if (await openExternalUrl(HELP_OVERVIEW_URL)) {
+    console.log(ansis.green(`  已尝试打开帮助网页：${HELP_OVERVIEW_URL}`))
+  }
+  else {
+    console.log(ansis.yellow(`  未能自动打开浏览器，请手动访问 ${HELP_OVERVIEW_URL}`))
   }
   console.log()
 }

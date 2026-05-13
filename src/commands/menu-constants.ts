@@ -22,7 +22,7 @@ export type ManagedPackage = {
   packageName?: string
   description?: string
   category?: 'cli' | 'desktop'
-  accountCategory?: 'client' | 'provider'
+  accountCategory?: 'client' | 'provider' | 'free-web-chat'
   installType?: 'npm' | 'external-link'
   openDirectly?: boolean
   externalUrl?: string
@@ -250,25 +250,36 @@ export const AI_ACCOUNT_MANAGEMENT_PACKAGES: ManagedPackage[] = [
   },
   {
     id: 'gpt-webfree-refill',
-    label: '免费 Web Chat 1',
+    label: 'SharedChat',
     description: '基于 chat.sharedchat.cc 的免费网页入口，可直接在线使用；地址：chat.sharedchat.cc',
-    accountCategory: 'provider',
+    accountCategory: 'free-web-chat',
     installType: 'external-link',
     openDirectly: true,
     externalUrl: 'https://chat.sharedchat.cc/',
     externalActionText: '打开网页',
-    statusHint: '供应商网页',
+    statusHint: '免费 Web Chat',
   },
   {
     id: 'halo-webui-free',
-    label: '免费 Web Chat 2',
+    label: 'OAIChat',
     description: '基于 chat.oaichat.cc 的 Halo WebUI 免费入口，可直接在线使用；地址：chat.oaichat.cc',
-    accountCategory: 'provider',
+    accountCategory: 'free-web-chat',
     installType: 'external-link',
     openDirectly: true,
     externalUrl: 'https://chat.oaichat.cc/',
     externalActionText: '打开网页',
-    statusHint: '供应商网页',
+    statusHint: '免费 Web Chat',
+  },
+  {
+    id: 'easychat-free',
+    label: 'EasyChat',
+    description: 'Claude 官方镜像免费使用入口，可直接在线使用；地址：easychat.top',
+    accountCategory: 'free-web-chat',
+    installType: 'external-link',
+    openDirectly: true,
+    externalUrl: 'https://easychat.top/',
+    externalActionText: '打开网页',
+    statusHint: '免费 Web Chat',
   },
 ]
 

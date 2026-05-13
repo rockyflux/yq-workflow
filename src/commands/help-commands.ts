@@ -3,6 +3,8 @@ export type HelpCommandItem = {
   description: string
 }
 
+export const HELP_OVERVIEW_URL = 'https://rockyflux.github.io/yq-workflow/'
+
 export const COMMON_HELP_COMMANDS: HelpCommandItem[] = [
   { command: 'npx yq-workflow', description: '打开主菜单' },
   { command: 'npx yq-workflow menu', description: '打开主菜单' },

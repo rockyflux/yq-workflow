@@ -169,7 +169,7 @@ npx yq-workflow config mcp
 
 ### AI 账号管理
 
-- 按“客户端”和“账号 / token 供应商”分组展示网页入口
+- 按“客户端”“账号 / token 供应商”“免费 Web Chat”分组展示网页入口
 - 包含科学上网推荐列表、续杯入口、账号购买与免费 Web Chat
 
 ### 模型使用统计
@@ -235,8 +235,9 @@ npx yq-workflow config mcp
 - 账号购买 1：<https://makerich.club/>
 - 账号购买 2：<https://wafase.com/>
 - AI 中转套餐大全：<https://apis.you/catalog>
-- 免费 Web Chat 1：<https://chat.sharedchat.cc/>
-- 免费 Web Chat 2：<https://chat.oaichat.cc/>
+- SharedChat：<https://chat.sharedchat.cc/>
+- OAIChat：<https://chat.oaichat.cc/>
+- EasyChat：<https://easychat.top/>
 
 ### MCP 生态
 

@@ -516,7 +516,7 @@ export async function runCodingToolsMenu(): Promise<void> {
 export async function runAiAccountManagementMenu(): Promise<void> {
   await runManagedPackageMenu(AI_ACCOUNT_MANAGEMENT_PACKAGES, {
     title: '模型账号管理、续杯',
-    subtitle: '按客户端与账号 / token 供应商分组展示常用入口，也包含科学上网推荐列表快捷入口',
+    subtitle: '按客户端、账号 / token 供应商、免费 Web Chat 分组展示常用入口，也包含科学上网推荐列表快捷入口',
     selectMessage: '选择要打开的网页',
     continueMessage: '按 Enter 返回 模型账号管理菜单...',
     silentDetection: true,
@@ -533,6 +533,13 @@ export async function runAiAccountManagementMenu(): Promise<void> {
       new inquirer.Separator('---------- 账号 / token 供应商 ----------'),
       ...statuses
         .filter(item => item.accountCategory === 'provider')
+        .map(item => ({
+          name: formatManagedPackageChoice(item),
+          value: item.id,
+        })),
+      new inquirer.Separator('---------- 免费 Web Chat ----------'),
+      ...statuses
+        .filter(item => item.accountCategory === 'free-web-chat')
         .map(item => ({
           name: formatManagedPackageChoice(item),
           value: item.id,
