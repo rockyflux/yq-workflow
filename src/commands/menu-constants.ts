@@ -31,6 +31,7 @@ export type ManagedPackage = {
   tutorialUrl?: string
   tutorialActionText?: string
   runOnly?: boolean
+  autoInstallOnRun?: boolean
   runCommand?: {
     command: string
     args: string[]
@@ -332,6 +333,19 @@ export const MODEL_USAGE_PACKAGES: ManagedPackage[] = [
       command: 'npx',
       args: ['claude-code-usage-analytics'],
       successText: '  网页版模型使用统计运行结束',
+    },
+  },
+  {
+    id: 'codeburn',
+    label: 'CodeBurn',
+    packageName: 'codeburn',
+    description: '多工具 AI 编程 Token / 成本观测 TUI 面板（Claude Code、Codex、Cursor 等）',
+    tutorialUrl: 'https://github.com/getagentseal/codeburn',
+    autoInstallOnRun: true,
+    runCommand: {
+      command: 'codeburn',
+      args: [],
+      successText: '  CodeBurn 运行结束',
     },
   },
 ]

@@ -1,10 +1,11 @@
-import { exec } from 'node:child_process'
+import { exec, execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import fs from 'fs-extra'
 import { dirname, join } from 'pathe'
 import { fileURLToPath } from 'node:url'
 
 const execAsync = promisify(exec)
+const execFileAsync = promisify(execFile)
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -76,6 +77,41 @@ export async function getLatestVersion(packageName = 'yq-workflow'): Promise<str
   }
   catch {
     return null
+  }
+}
+
+/**
+ * Read a CLI version string when available.
+ */
+export async function getCommandVersion(command: string): Promise<string | null> {
+  try {
+    const { stdout, stderr } = await execFileAsync(command, ['--version'], {
+      timeout: 10000,
+      windowsHide: true,
+    })
+    const output = `${stdout}\n${stderr}`.trim()
+    const match = output.match(/(\d+\.\d+\.\d+(?:[-+.\w]*)?)/u)
+    return match?.[1] || null
+  }
+  catch {
+    return null
+  }
+}
+
+/**
+ * Check whether a CLI command is available on PATH.
+ */
+export async function isCommandAvailable(command: string): Promise<boolean> {
+  try {
+    const locator = process.platform === 'win32' ? 'where.exe' : 'which'
+    const { stdout } = await execFileAsync(locator, [command], {
+      timeout: 10000,
+      windowsHide: true,
+    })
+    return stdout.split(/\r?\n/u).map(item => item.trim()).some(Boolean)
+  }
+  catch {
+    return false
   }
 }
 

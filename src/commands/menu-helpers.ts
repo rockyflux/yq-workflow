@@ -40,7 +40,8 @@ function resolveInteractiveCommand(command: string, args: string[]): { command: 
     }
   }
 
-  if (['npm', 'npx', 'pnpm', 'corepack'].includes(command)) {
+  // npm 全局 CLI 在 Windows 上通常是 .cmd shim，直接 spawn 会 ENOENT。
+  if (['npm', 'npx', 'pnpm', 'corepack'].includes(command) || !/[\\/]/u.test(command)) {
     return {
       command: 'cmd',
       args: ['/c', command, ...args],

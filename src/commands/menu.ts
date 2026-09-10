@@ -181,7 +181,7 @@ export async function showMainMenu(): Promise<void> {
         { name: formatMenuChoice('E. 基础环境检测', '- Git, PowerShell, Node.js, Python, pip, pnpm, uv, rg, VS Code'), value: 'environment' },
         { name: formatMenuChoice('C. 安装编程工具', '- CLI 命令行版 / 桌面端 UI'), value: 'coding-tools' },
         { name: formatMenuChoice('I. 模型账号管理', '- 客户端 / 续杯工具'), value: 'ai-accounts' },
-        { name: formatMenuChoice('U. 模型使用统计', '- Claude Code / Codex / 网页版统计工具'), value: 'model-usage' },
+        { name: formatMenuChoice('U. 模型使用统计', '- Claude Code / Codex / 网页版 / CodeBurn'), value: 'model-usage' },
         new inquirer.Separator(`${MENU_SEPARATOR} YQ ${MENU_SEPARATOR}`),
         { name: formatMenuChoice('H. 帮助', '- 查看已安装命令、Skills 与工具'), value: 'help' },
         { name: formatMenuChoice('-. 卸载和删除配置', '- 移除工作流文件并删除 yq-workflow'), value: 'uninstall' },

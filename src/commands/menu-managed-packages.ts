@@ -1,7 +1,7 @@
 import ansis from 'ansis'
 import inquirer from 'inquirer'
 import ora from 'ora'
-import { compareVersions, getGlobalPackageVersion, getLatestVersion } from '../utils/version'
+import { compareVersions, getCommandVersion, getGlobalPackageVersion, getLatestVersion, isCommandAvailable } from '../utils/version'
 import {
   AI_ACCOUNT_MANAGEMENT_PACKAGES,
   CLAUDE_CODE_TOOL_PACKAGES,
@@ -12,6 +12,24 @@ import {
 } from './menu-constants'
 import type { ManagedPackage, ManagedPackageStatus } from './menu-constants'
 import { openExternalUrl, promptMenuList, runInteractiveCommand } from './menu-helpers'
+
+async function resolveManagedPackageInstalledVersion(item: ManagedPackage): Promise<string | null> {
+  if (!item.packageName) {
+    return null
+  }
+
+  const npmVersion = await getGlobalPackageVersion(item.packageName)
+  if (npmVersion) {
+    return npmVersion
+  }
+
+  const commandName = item.runCommand?.command || item.packageName
+  if (item.autoInstallOnRun && await isCommandAvailable(commandName)) {
+    return await getCommandVersion(commandName) || 'installed'
+  }
+
+  return null
+}
 
 async function getManagedPackageStatuses(packages: ManagedPackage[]): Promise<ManagedPackageStatus[]> {
   return Promise.all(
@@ -25,7 +43,7 @@ async function getManagedPackageStatuses(packages: ManagedPackage[]): Promise<Ma
       }
 
       const [installedVersion, latestVersion] = await Promise.all([
-        getGlobalPackageVersion(item.packageName),
+        resolveManagedPackageInstalledVersion(item),
         getLatestVersion(item.packageName),
       ])
 
@@ -56,6 +74,31 @@ async function detectManagedPackageStatuses(
     spinner?.fail(`${title}版本检测失败`)
     throw error
   }
+}
+
+function hasManagedPackageUpdate(item: ManagedPackageStatus): boolean {
+  if (!item.installedVersion || !item.latestVersion || item.installedVersion === 'installed') {
+    return false
+  }
+
+  return compareVersions(item.latestVersion, item.installedVersion) > 0
+}
+
+function formatManagedPackageVersionSummary(item: ManagedPackageStatus): string | null {
+  if (!item.installedVersion) {
+    const latestText = item.latestVersion ? `最新 v${item.latestVersion}` : '最新查询失败'
+    return `未安装 / ${latestText}`
+  }
+
+  if (hasManagedPackageUpdate(item)) {
+    const currentText = item.installedVersion === 'installed'
+      ? '当前 已安装'
+      : `当前 v${item.installedVersion}`
+    const latestText = item.latestVersion ? `最新 v${item.latestVersion}` : '最新查询失败'
+    return `${currentText} / ${latestText}`
+  }
+
+  return null
 }
 
 function printManagedPackageStatusLines(
@@ -104,13 +147,13 @@ function printManagedPackageStatusLines(
       continue
     }
 
-    const installedText = item.installedVersion
-      ? ansis.yellow(`v${item.installedVersion}`)
-      : ansis.gray('未安装')
-    const latestText = item.latestVersion
-      ? ansis.green(`v${item.latestVersion}`)
-      : ansis.red('查询失败')
-    console.log(`  ${ansis.cyan(item.label.padEnd(14))} 当前: ${installedText}  最新: ${latestText}`)
+    const versionSummary = formatManagedPackageVersionSummary(item)
+    if (versionSummary) {
+      console.log(`  ${ansis.cyan(item.label.padEnd(14))} ${versionSummary}`)
+    }
+    else {
+      console.log(`  ${ansis.cyan(item.label.padEnd(14))}`)
+    }
     if (item.description) {
       console.log(ansis.gray(`  ${' '.repeat(16)}${item.description}`))
     }
@@ -140,10 +183,12 @@ function formatManagedPackageChoice(item: ManagedPackageStatus): string {
     return `${item.label}  ${ansis.gray(`- ${item.latestVersion || '桌面客户端下载'}${description}`)}`
   }
 
-  const currentText = item.installedVersion ? `当前 v${item.installedVersion}` : '未安装'
-  const latestText = item.latestVersion ? `最新 v${item.latestVersion}` : '最新查询失败'
-  const description = item.description ? `；${item.description}` : ''
-  return `${item.label}  ${ansis.gray(`- ${currentText} / ${latestText}${description}`)}`
+  const versionSummary = formatManagedPackageVersionSummary(item)
+  const description = item.description || ''
+  const hint = versionSummary
+    ? `${versionSummary}${description ? `；${description}` : ''}`
+    : description
+  return `${item.label}  ${ansis.gray(`- ${hint}`)}`
 }
 
 function getPackageActionLabel(item: ManagedPackageStatus): string {
@@ -271,15 +316,104 @@ async function uninstallManagedPackage(item: ManagedPackageStatus): Promise<void
   console.log()
 }
 
+async function installManagedPackageForRun(item: ManagedPackageStatus): Promise<void> {
+  if (!item.packageName) {
+    throw new Error(`${item.label} 缺少 npm 包名配置`)
+  }
+
+  if (process.platform === 'darwin' && await isCommandAvailable('brew')) {
+    console.log(ansis.gray(`  检测到 Homebrew，尝试使用 brew install ${item.packageName}...`))
+    try {
+      await runInteractiveCommand('brew', ['install', item.packageName])
+      return
+    }
+    catch {
+      console.log(ansis.yellow('  Homebrew 安装失败，改用 npm 全局安装...'))
+    }
+  }
+
+  await runInteractiveCommand('npm', ['install', '-g', `${item.packageName}@latest`])
+}
+
+async function resolveManagedPackageRunCommand(item: ManagedPackageStatus): Promise<{ command: string, args: string[] }> {
+  if (!item.runCommand) {
+    throw new Error(`${item.label} 未配置运行命令`)
+  }
+
+  const commandName = item.runCommand.command
+  const args = item.runCommand.args
+
+  // Windows 上 npm 全局 CLI 多为 .cmd shim，统一用 npx 运行。
+  if (process.platform === 'win32' && item.packageName && commandName !== 'npx') {
+    return {
+      command: 'npx',
+      args: [item.packageName, ...args],
+    }
+  }
+
+  if (item.packageName) {
+    const npmInstalled = await getGlobalPackageVersion(item.packageName)
+    if (npmInstalled) {
+      return {
+        command: 'npx',
+        args: [item.packageName, ...args],
+      }
+    }
+  }
+
+  if (await isCommandAvailable(commandName)) {
+    return {
+      command: commandName,
+      args,
+    }
+  }
+
+  if (item.packageName) {
+    return {
+      command: 'npx',
+      args: [item.packageName, ...args],
+    }
+  }
+
+  return {
+    command: commandName,
+    args,
+  }
+}
+
+async function ensureManagedPackageReadyForRun(item: ManagedPackageStatus): Promise<void> {
+  if (!item.autoInstallOnRun || !item.packageName || !item.runCommand) {
+    return
+  }
+
+  const commandName = item.runCommand.command
+  const npmInstalled = await getGlobalPackageVersion(item.packageName)
+  const commandInstalled = await isCommandAvailable(commandName)
+
+  if (npmInstalled || commandInstalled) {
+    return
+  }
+
+  console.log()
+  console.log(ansis.cyan(`  未检测到 ${item.label}，正在自动安装...`))
+  console.log()
+  await installManagedPackageForRun(item)
+}
+
 async function runManagedPackage(item: ManagedPackageStatus): Promise<void> {
   if (!item.runCommand) {
     return
   }
 
+  await ensureManagedPackageReadyForRun(item)
+
   console.log()
   console.log(ansis.cyan(`  正在运行 ${item.label}...`))
   console.log()
-  await runInteractiveCommand(item.runCommand.command, item.runCommand.args)
+
+  const resolved = await resolveManagedPackageRunCommand(item)
+  await runInteractiveCommand(resolved.command, resolved.args)
+
   if (item.runCommand.successText) {
     console.log(ansis.green(item.runCommand.successText))
   }
@@ -409,6 +543,17 @@ async function runManagedPackageMenu(
 
     const selected = statuses.find(item => item.id === target)
     if (!selected) continue
+
+    if (selected.autoInstallOnRun && selected.runCommand) {
+      await runManagedPackage(selected)
+
+      await inquirer.prompt([{
+        type: 'input',
+        name: 'continue',
+        message: ansis.gray(options.continueMessage),
+      }])
+      continue
+    }
 
     if (selected.openDirectly) {
       console.log()
@@ -560,7 +705,7 @@ export async function runClaudeCodeToolsMenu(): Promise<void> {
 export async function runModelUsageMenu(): Promise<void> {
   await runManagedPackageMenu(MODEL_USAGE_PACKAGES, {
     title: '模型使用统计',
-    subtitle: '统一运行 Claude Code、Codex 与网页版的模型使用统计命令',
+    subtitle: '统一运行 Claude Code、Codex、网页版与 CodeBurn 的模型使用统计命令',
     selectMessage: '选择要运行的模型使用统计工具',
     continueMessage: '按 Enter 返回模型使用统计菜单...',
     silentDetection: true,

@@ -106,7 +106,7 @@ npx yq-workflow config mcp
 - 基础环境检测：`Git`、`PowerShell`、`Node.js`、`Python`、`pip`、`pnpm`、`uv`、`ripgrep (rg)`、`VS Code`
 - 安装编程工具：统一管理 `Claude Code`、`Codex CLI`、`Gemini CLI`、`OpenCode`，以及 `AionUi`、`MossX`、`Codex App`、`Any Code`
 - AI 账号管理：`cc-switch`、`Cockpit Tools`、`Cherry Studio` 与供应商入口
-- 模型使用统计：`Claude Code`、`Codex`、`网页版`
+- 模型使用统计：`Claude Code`、`Codex`、`网页版`、`CodeBurn`
 - 本地网页版 Skills 若已运行，再次打开会复用现有页面；可在 Skills 菜单里关闭，也可执行 `npx yq-workflow config skills-web-close`
 - 网页右上角提供“关闭服务”按钮，可直接在浏览器里关闭当前 Skills 服务
 - 帮助页：仅显示主菜单对应的常用 `npx` 命令与操作提示
@@ -174,7 +174,7 @@ npx yq-workflow config mcp
 
 ### 模型使用统计
 
-- 运行 `Claude Code`、`Codex`、`网页版` 三类统计命令
+- 运行 `Claude Code`、`Codex`、`网页版`、`CodeBurn` 四类统计命令；`CodeBurn` 会自动检测安装状态，未安装时自动安装后运行
 
 ### 帮助
 
