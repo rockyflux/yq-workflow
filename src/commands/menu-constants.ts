@@ -22,7 +22,7 @@ export type ManagedPackage = {
   packageName?: string
   description?: string
   category?: 'cli' | 'desktop'
-  accountCategory?: 'client' | 'provider' | 'free-web-chat'
+  accountCategory?: 'client' | 'provider'
   installType?: 'npm' | 'external-link'
   openDirectly?: boolean
   externalUrl?: string
@@ -73,50 +73,59 @@ export const CODING_TOOL_PACKAGES: ManagedPackage[] = [
     category: 'cli',
     description: 'OpenCode.ai 命令行工具',
   },
-   {
-    id: 'aionui',
-    label: 'AionUi',
+  {
+    id: 'pi',
+    label: 'Pi',
+    packageName: '@earendil-works/pi-coding-agent',
+    category: 'cli',
+    description: '可扩展的极简 Agent 运行时',
+    tutorialUrl: 'https://pi.dev/',
+    tutorialActionText: '打开官网',
+  },
+  {
+    id: 'orca',
+    label: 'Orca',
     category: 'desktop',
-    description: '自动识别你电脑上的 Claude Code、Codex、Gemini CLI 等 20+ 款 CLI',
+    description: 'Agent 开发环境，并行运行 Claude Code、Codex 等 CLI Agent',
     installType: 'external-link',
     openDirectly: true,
-    externalUrl: 'https://www.aionui.com/zh/',
+    externalUrl: 'https://www.onorca.dev/',
     externalActionText: '打开下载页',
-    tutorialUrl: 'https://www.aionui.com/zh/',
+    tutorialUrl: 'https://www.onorca.dev/',
     tutorialActionText: '打开项目主页',
   },
   {
-    id: 'mossx-client',
-    label: 'MossX 客户端',
+    id: 'dsh-desktop',
+    label: 'DSH Desktop',
     category: 'desktop',
-    description: 'MossX 桌面端客户端',
+    description: 'DeepSeek Harness 开源桌面客户端',
     installType: 'external-link',
     openDirectly: true,
-    externalUrl: 'https://www.mossx.ai/download',
+    externalUrl: 'https://www.dshdesktop.cn/',
     externalActionText: '打开下载页',
   },
   {
-    id: 'codex-app',
-    label: 'Codex App',
+    id: 'terax',
+    label: 'Terax',
     category: 'desktop',
-    description: 'Codex 桌面端',
+    description: '终端优先的 AI 原生开发工作区',
     installType: 'external-link',
     openDirectly: true,
-    externalUrl: 'https://www.codex-docs.com/getting-started/quickstart',
-    externalActionText: '打开安装指引',
-    tutorialUrl: 'https://www.codex-docs.com/getting-started/quickstart',
-    tutorialActionText: '打开快速开始',
+    externalUrl: 'https://terax.app/',
+    externalActionText: '打开下载页',
+    tutorialUrl: 'https://terax.app/',
+    tutorialActionText: '打开项目主页',
   },
   {
-    id: 'any-code',
-    label: 'Any Code',
+    id: 'cli-manager',
+    label: 'CLI-Manager',
     category: 'desktop',
-    description: '支持 Claude Code / Codex / Gemini 的桌面应用',
+    description: '跨平台 AI CLI 工作台',
     installType: 'external-link',
     openDirectly: true,
-    externalUrl: 'https://github.com/anyme123/Any-code/releases',
+    externalUrl: 'https://cli-manager.github.io/',
     externalActionText: '打开下载页',
-    tutorialUrl: 'https://github.com/anyme123/Any-code',
+    tutorialUrl: 'https://cli-manager.github.io/',
     tutorialActionText: '打开项目主页',
   },
 ]
@@ -126,8 +135,20 @@ export const CODING_TOOL_CLI_PACKAGES = CODING_TOOL_PACKAGES.filter(item => item
 export const CODING_TOOL_DESKTOP_PACKAGES = CODING_TOOL_PACKAGES.filter(item => item.category === 'desktop')
 
 export const CC_SWITCH_RELEASES_URL = 'https://github.com/farion1231/cc-switch/releases'
+export const MAGPIE_HOME_URL = 'https://usemagpie.ai/zh/'
 
 export const AI_ACCOUNT_MANAGEMENT_PACKAGES: ManagedPackage[] = [
+  {
+    id: 'magpie',
+    label: 'magpie',
+    description: '本地模型网关，一次配置供应商后在 Claude Code、Codex、Gemini CLI 等 Agent 中一键切换模型',
+    accountCategory: 'client',
+    installType: 'external-link',
+    openDirectly: true,
+    externalUrl: MAGPIE_HOME_URL,
+    externalActionText: '打开官网',
+    statusHint: '官方网站',
+  },
   {
     id: 'cc-switch',
     label: 'cc-switch',
@@ -208,11 +229,11 @@ export const AI_ACCOUNT_MANAGEMENT_PACKAGES: ManagedPackage[] = [
   {
     id: 'suiyuee-unlimited-refill',
     label: '无限续杯工具 2',
-    description: '支持 Codex、Cursor、Windsurf、Kiro 等，适合常规续杯场景；地址：suiyuee.top/shop',
+    description: '支持 Codex、Cursor、Windsurf、Kiro 等，适合常规续杯场景；地址：q.chuhai.cool',
     accountCategory: 'provider',
     installType: 'external-link',
     openDirectly: true,
-    externalUrl: 'https://suiyuee.top/shop',
+    externalUrl: 'https://q.chuhai.cool/',
     externalActionText: '打开网页',
     statusHint: '供应商网页',
   },
@@ -241,46 +262,13 @@ export const AI_ACCOUNT_MANAGEMENT_PACKAGES: ManagedPackage[] = [
   {
     id: 'apis-you-refill',
     label: 'AI 中转套餐大全',
-    description: '聚合多种中转套餐，适合按目录筛选 Claude Code 相关方案；地址：apis.you/catalog',
+    description: 'Coding Plan 与渠道指南，汇总常见编程套餐与中转方案；地址：rockyflux.github.io/ai-guide/programming/coding-plan.html',
     accountCategory: 'provider',
     installType: 'external-link',
     openDirectly: true,
-    externalUrl: 'https://apis.you/catalog',
+    externalUrl: 'https://rockyflux.github.io/ai-guide/programming/coding-plan.html',
     externalActionText: '打开网页',
     statusHint: '供应商网页',
-  },
-  {
-    id: 'gpt-webfree-refill',
-    label: 'SharedChat',
-    description: '基于 chat.sharedchat.cc 的免费网页入口，可直接在线使用；地址：chat.sharedchat.cc',
-    accountCategory: 'free-web-chat',
-    installType: 'external-link',
-    openDirectly: true,
-    externalUrl: 'https://chat.sharedchat.cc/',
-    externalActionText: '打开网页',
-    statusHint: '免费 Web Chat',
-  },
-  {
-    id: 'halo-webui-free',
-    label: 'OAIChat',
-    description: '基于 chat.oaichat.cc 的 Halo WebUI 免费入口，可直接在线使用；地址：chat.oaichat.cc',
-    accountCategory: 'free-web-chat',
-    installType: 'external-link',
-    openDirectly: true,
-    externalUrl: 'https://chat.oaichat.cc/',
-    externalActionText: '打开网页',
-    statusHint: '免费 Web Chat',
-  },
-  {
-    id: 'easychat-free',
-    label: 'EasyChat',
-    description: 'Claude 官方镜像免费使用入口，可直接在线使用；地址：easychat.top',
-    accountCategory: 'free-web-chat',
-    installType: 'external-link',
-    openDirectly: true,
-    externalUrl: 'https://easychat.top/',
-    externalActionText: '打开网页',
-    statusHint: '免费 Web Chat',
   },
 ]
 
@@ -391,5 +379,6 @@ export const MENU_RESOURCES = [
 
 export const HEADER_INNER_WIDTH = 60
 export const SKILLS_SH_URL = 'https://skills.sh/'
-export const SKILLS_MANAGE_URL = 'https://github.com/iamzhihuix/skills-manage'
+export const SKILLS_MANAGE_URL = 'https://skillsmanager.dev/zh'
+export const PROMPTHUB_URL = 'https://prompthub.click/'
 export const MENU_SEPARATOR = '----------'

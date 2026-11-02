@@ -1,5 +1,22 @@
 # Changelog
 
+## [Unreleased]
+
+## [1.1.5] - 2026-11-02
+
+### ✨ 新功能
+
+- `提示词配置` 对齐 Skills 菜单结构：可选本地提示词配置页，或打开桌面软件 PromptHub
+- AI 账号管理客户端新增 `magpie`（<https://usemagpie.ai/zh/>），位于 `cc-switch` 上方
+- “AI 中转套餐大全”入口改为 <https://rockyflux.github.io/ai-guide/programming/coding-plan.html>
+- “无限续杯工具 2”入口改为 <https://q.chuhai.cool/>
+- 移除 AI 账号管理中的“免费 Web Chat”分组及 SharedChat / OAIChat / EasyChat 入口
+
+### 🔄 变更
+
+- 桌面端 UI 入口替换为 `Orca`、`DSH Desktop`、`Terax`、`CLI-Manager`
+- CLI 命令行版新增 `Pi`（`@earendil-works/pi-coding-agent`，官网 <https://pi.dev/>）
+
 ## [1.1.2] - 2026-05-10
 
 ### 🔄 变更

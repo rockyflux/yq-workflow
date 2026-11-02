@@ -99,13 +99,13 @@ npx yq-workflow config mcp
 - 工作流安装 / 重装
 - 工作流更新
 - 热门开源工作流
-- 提示词配置：本地网页统一编辑 Claude / Codex / Gemini / Cursor / Kiro
-- 配置 Skills：本地网页版 Skills、查看本地目录、跳转 Skills Manage
+- 提示词配置：本地网页统一编辑 Claude / Codex / Gemini / Cursor / Kiro，或打开 PromptHub 桌面软件
+- 配置 Skills：本地网页版 Skills、查看本地目录、跳转 Skills Manage 官网
 - MCP 配置
 - Claude Code 工具：`Claude Code`、`ccusage`、`CCR`、`CCometixLine`、`Claude HUD`
 - 基础环境检测：`Git`、`PowerShell`、`Node.js`、`Python`、`pip`、`pnpm`、`uv`、`ripgrep (rg)`、`VS Code`
-- 安装编程工具：统一管理 `Claude Code`、`Codex CLI`、`Gemini CLI`、`OpenCode`，以及 `AionUi`、`MossX`、`Codex App`、`Any Code`
-- AI 账号管理：`cc-switch`、`Cockpit Tools`、`Cherry Studio` 与供应商入口
+- 安装编程工具：统一管理 `Claude Code`、`Codex CLI`、`Gemini CLI`、`OpenCode`、`Pi`，以及 `Orca`、`DSH Desktop`、`Terax`、`CLI-Manager`
+- AI 账号管理：`magpie`、`cc-switch`、`Cockpit Tools`、`Cherry Studio` 与供应商入口
 - 模型使用统计：`Claude Code`、`Codex`、`网页版`、`CodeBurn`
 - 本地网页版 Skills 若已运行，再次打开会复用现有页面；可在 Skills 菜单里关闭，也可执行 `npx yq-workflow config skills-web-close`
 - 网页右上角提供“关闭服务”按钮，可直接在浏览器里关闭当前 Skills 服务
@@ -132,6 +132,8 @@ npx yq-workflow config mcp
 
 ### 提示词配置
 
+- 菜单可选本地提示词配置页，或打开桌面软件 PromptHub
+- 若本地网页已在运行，会显示运行中状态并支持复用
 - 打开本地网页编辑 Claude、Codex、Gemini、Cursor、Kiro 的提示词文件
 - 保存前确认
 - 自动备份并支持历史恢复
@@ -141,7 +143,7 @@ npx yq-workflow config mcp
 
 - 打开本地网页版 Skills
 - 查看本地 Skills 目录
-- 打开 `Skills Manage` 项目页
+- 打开 `Skills Manage` 官网
 
 ### 配置 MCP
 
@@ -163,14 +165,14 @@ npx yq-workflow config mcp
 
 ### 安装编程工具
 
-- `CLI 命令行版`：`Claude Code`、`Codex CLI`、`Gemini CLI`、`OpenCode`
-- `桌面端 UI`：`AionUi`、`MossX 客户端`、`Codex App`、`Any Code`
+- `CLI 命令行版`：`Claude Code`、`Codex CLI`、`Gemini CLI`、`OpenCode`、`Pi`
+- `桌面端 UI`：`Orca`、`DSH Desktop`、`Terax`、`CLI-Manager`
 - CLI 支持版本检测与安装 / 更新 / 卸载
 
 ### AI 账号管理
 
-- 按“客户端”“账号 / token 供应商”“免费 Web Chat”分组展示网页入口
-- 包含科学上网推荐列表、续杯入口、账号购买与免费 Web Chat
+- 按“客户端”“账号 / token 供应商”分组展示网页入口
+- 包含科学上网推荐列表、续杯入口与账号购买
 
 ### 模型使用统计
 
@@ -199,7 +201,7 @@ npx yq-workflow config mcp
 ### Skills 相关
 
 - Skills 官方目录：<https://skills.sh/>
-- Skills Manage 项目页：<https://github.com/iamzhihuix/skills-manage>
+- Skills Manage 官网：<https://skillsmanager.dev/zh>
 
 ### 热门开源工作流
 
@@ -211,16 +213,20 @@ npx yq-workflow config mcp
 
 - Claude HUD 项目页：<https://github.com/jarrodwatts/claude-hud/>
 
+### CLI 编程工具
+
+- Pi 官网：<https://pi.dev/>
+
 ### 桌面端编程工具
 
-- AionUi：<https://www.aionui.com/zh/>
-- MossX 客户端下载页：<https://www.mossx.ai/download>
-- Codex App 安装指引：<https://www.codex-docs.com/getting-started/quickstart>
-- Any Code 下载页：<https://github.com/anyme123/Any-code/releases>
-- Any Code 项目页：<https://github.com/anyme123/Any-code>
+- Orca：<https://www.onorca.dev/>
+- DSH Desktop：<https://www.dshdesktop.cn/>
+- Terax：<https://terax.app/>
+- CLI-Manager：<https://cli-manager.github.io/>
 
 ### 账号与客户端工具
 
+- magpie 官网：<https://usemagpie.ai/zh/>
 - cc-switch 下载页：<https://github.com/farion1231/cc-switch/releases>
 - Cockpit Tools：<https://github.com/jlcodes99/cockpit-tools>
 - Cherry Studio 官网：<https://www.cherry-ai.com/>
@@ -231,13 +237,10 @@ npx yq-workflow config mcp
 
 - 科学上网推荐列表：<https://www.ermao.net/posts/vpn>
 - 无限续杯工具 1：<https://pay.ldxp.cn/shop/xxdlzs>
-- 无限续杯工具 2：<https://suiyuee.top/shop>
+- 无限续杯工具 2：<https://q.chuhai.cool/>
 - 账号购买 1：<https://makerich.club/>
 - 账号购买 2：<https://wafase.com/>
-- AI 中转套餐大全：<https://apis.you/catalog>
-- SharedChat：<https://chat.sharedchat.cc/>
-- OAIChat：<https://chat.oaichat.cc/>
-- EasyChat：<https://easychat.top/>
+- AI 中转套餐大全：<https://rockyflux.github.io/ai-guide/programming/coding-plan.html>
 
 ### MCP 生态
 

@@ -40,7 +40,7 @@ features:
     details: '内置 29 个 `/yq:*` 命令，并同步 `yq`、`yq-base`、`superpowers` 三组技能镜像到本地目录，方便 Claude Code、Codex、Gemini CLI 等工具复用。'
   - icon: '6'
     title: '工具入口与检测放在一起'
-    details: '除了 Claude Code、Codex、Gemini CLI、OpenCode 等 CLI，也提供 AionUi、MossX、Codex App、Any Code 等桌面端下载入口与基础环境版本检测。'
+    details: '除了 Claude Code、Codex、Gemini CLI、OpenCode、Pi 等 CLI，也提供 Orca、DSH Desktop、Terax、CLI-Manager 等桌面端下载入口与基础环境版本检测。'
 ---
 
 ## 这是什么

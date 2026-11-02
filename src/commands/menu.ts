@@ -13,9 +13,10 @@ import {
   HEADER_INNER_WIDTH,
   MENU_RESOURCES,
   MENU_SEPARATOR,
+  PROMPTHUB_URL,
 } from './menu-constants'
 import type { MenuAction } from './menu-constants'
-import { formatMenuChoice, promptMenuList, runInteractiveCommand } from './menu-helpers'
+import { formatMenuChoice, openExternalUrl, promptMenuList, runInteractiveCommand } from './menu-helpers'
 import {
   runAiAccountManagementMenu,
   runClaudeCodeToolsMenu,
@@ -68,45 +69,82 @@ async function configApi(): Promise<void> {
 }
 
 async function configPrompt(): Promise<void> {
-  const activePromptWeb = await getActivePromptWebState()
-  console.log()
-  console.log(ansis.cyan.bold('  提示词配置'))
-  console.log(ansis.gray(`  Claude：${join(homedir(), '.claude', 'CLAUDE.md')}`))
-  console.log(ansis.gray(`  Codex：${join(homedir(), '.codex', 'AGENTS.md')}`))
-  console.log(ansis.gray(`  Gemini：${join(homedir(), '.gemini', 'GEMINI.md')}`))
-  console.log(ansis.gray(`  Cursor：${join(homedir(), '.cursor', 'rules', 'guidelines.mdc')}`))
-  console.log(ansis.gray(`  Kiro：${join(homedir(), '.kiro', 'steering', 'kiro.md')}`))
-  if (activePromptWeb) {
-    console.log(ansis.green(`  本地提示词配置页运行中：${activePromptWeb.url}`))
-  }
-  console.log()
+  while (true) {
+    const activePromptWeb = await getActivePromptWebState()
+    console.log()
+    console.log(ansis.cyan.bold('  提示词配置'))
+    console.log(ansis.gray(`  Claude：${join(homedir(), '.claude', 'CLAUDE.md')}`))
+    console.log(ansis.gray(`  Codex：${join(homedir(), '.codex', 'AGENTS.md')}`))
+    console.log(ansis.gray(`  Gemini：${join(homedir(), '.gemini', 'GEMINI.md')}`))
+    console.log(ansis.gray(`  Cursor：${join(homedir(), '.cursor', 'rules', 'guidelines.mdc')}`))
+    console.log(ansis.gray(`  Kiro：${join(homedir(), '.kiro', 'steering', 'kiro.md')}`))
+    console.log(ansis.gray(`  桌面软件 PromptHub：${PROMPTHUB_URL}`))
+    if (activePromptWeb) {
+      console.log(ansis.green(`  本地提示词配置页运行中：${activePromptWeb.url}`))
+    }
+    console.log()
 
-  const result = await launchPromptWebDetached('claude')
-  if (result.status === 'reused') {
-    console.log(ansis.green(`  已复用已打开的提示词配置页：${result.url}`))
-  }
-  else {
-    console.log(ansis.green('  已尝试打开本地提示词配置页，默认展示 Claude 提示词'))
-  }
-  console.log(ansis.gray('  如未自动打开，可执行 yq config prompt-web'))
-  console.log(ansis.gray('  按 Enter 将关闭本地提示词配置页，并自动返回'))
-  console.log()
+    const { action } = await promptMenuList([{
+      type: 'list',
+      name: 'action',
+      message: '选择提示词操作',
+      pageSize: 12,
+      choices: [
+        { name: '1. 本地提示词配置页', value: 'web' },
+        { name: '2. 桌面软件 PromptHub', value: 'desktop-prompthub' },
+        { name: 'B. 返回', value: 'back' },
+      ],
+    }])
 
-  await inquirer.prompt([{
-    type: 'input',
-    name: 'continue',
-    message: ansis.gray('按 Enter 关闭本地提示词配置页并返回...'),
-  }])
+    if (action === 'back') return
 
-  const closed = await closePromptWebServer()
-  console.log()
-  if (closed) {
-    console.log(ansis.green('  已关闭本地提示词配置页'))
+    if (action === 'web') {
+      const result = await launchPromptWebDetached('claude')
+      console.log()
+      if (result.status === 'reused') {
+        console.log(ansis.green(`  已复用已打开的提示词配置页：${result.url}`))
+      }
+      else {
+        console.log(ansis.green('  已尝试打开本地提示词配置页，默认展示 Claude 提示词'))
+      }
+      console.log(ansis.gray('  如未自动打开，可执行 yq config prompt-web'))
+      console.log(ansis.gray('  按 Enter 将关闭本地提示词配置页，并自动返回菜单'))
+      console.log()
+
+      await inquirer.prompt([{
+        type: 'input',
+        name: 'continue',
+        message: ansis.gray('按 Enter 关闭本地提示词配置页并返回菜单...'),
+      }])
+
+      const closed = await closePromptWebServer()
+      console.log()
+      if (closed) {
+        console.log(ansis.green('  已关闭本地提示词配置页'))
+      }
+      else {
+        console.log(ansis.gray('  当前没有运行中的本地提示词配置页'))
+      }
+      console.log()
+      continue
+    }
+    else if (action === 'desktop-prompthub') {
+      console.log()
+      if (await openExternalUrl(PROMPTHUB_URL)) {
+        console.log(ansis.green('  已尝试打开 PromptHub 官网'))
+      }
+      else {
+        console.log(ansis.yellow(`  未能自动打开浏览器，请手动访问 ${PROMPTHUB_URL}`))
+      }
+      console.log()
+    }
+
+    await inquirer.prompt([{
+      type: 'input',
+      name: 'continue',
+      message: ansis.gray('按 Enter 返回提示词配置菜单...'),
+    }])
   }
-  else {
-    console.log(ansis.gray('  当前没有运行中的本地提示词配置页'))
-  }
-  console.log()
 }
 
 export {
@@ -173,7 +211,7 @@ export async function showMainMenu(): Promise<void> {
         { name: formatMenuChoice('1. 初始化 / 重装工作流', '- 安装 YQ 工作流'), value: 'init' },
         { name: updateMenuChoice, value: 'update' },
         { name: formatMenuChoice('3. 热门开源工作流', '- GET SHIT DONE / gstack / Trellis'), value: 'popular-workflows' },
-        { name: formatMenuChoice('4. 提示词配置', '- Claude / Codex / Gemini / Cursor / Kiro 提示词编辑器'), value: 'prompts' },
+        { name: formatMenuChoice('4. 提示词配置', '- 本地网页 + PromptHub 桌面软件'), value: 'prompts' },
         { name: formatMenuChoice('5. 配置 Skills', '- Skills.sh + 本地 Skills 目录'), value: 'skills' },
         { name: formatMenuChoice('6. 配置 MCP', '- Claude / Codex / Gemini / Cursor / Kiro 本地网页管理'), value: 'mcp' },
         new inquirer.Separator(`${MENU_SEPARATOR} 编程工具 ${MENU_SEPARATOR}`),

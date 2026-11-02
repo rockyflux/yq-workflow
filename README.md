@@ -125,11 +125,11 @@ npx yq-workflow update
 
 ### 3. 想整理 Skills
 
-进入 `配置 Skills`，可以打开本地网页版 Skills、查看本地技能目录，或者跳转到 `Skills Manage` 项目页。
+进入 `配置 Skills`，可以打开本地网页版 Skills、查看本地技能目录，或者跳转到 `Skills Manage` 官网。
 
 ### 4. 想调整提示词
 
-进入 `提示词配置`，统一编辑 Claude、Codex、Gemini、Cursor、Kiro 的提示词文件；保存前会先确认，并自动保留备份，每种提示词最多保留最新 10 份。你也可以在这里继续微调“什么时候该把经验、方案、排障记录写到 Obsidian”的规则。
+进入 `提示词配置`，可以选择本地网页版编辑器，或打开桌面软件 [PromptHub](https://prompthub.click/)。本地网页会统一编辑 Claude、Codex、Gemini、Cursor、Kiro 的提示词文件；保存前会先确认，并自动保留备份，每种提示词最多保留最新 10 份。你也可以在这里继续微调“什么时候该把经验、方案、排障记录写到 Obsidian”的规则。
 
 ### 5. 想看工具是否装好
 
@@ -137,7 +137,7 @@ npx yq-workflow update
 
 ### 6. 想找模型账号或科学上网入口
 
-进入 `AI 账号管理`，可以按客户端、账号 / token 供应商、免费 Web Chat 分组打开常用网页入口，也可以直接打开科学上网推荐列表。
+进入 `AI 账号管理`，可以按客户端、账号 / token 供应商分组打开常用网页入口，也可以直接打开科学上网推荐列表。
 
 ## 常用命令
 
@@ -156,10 +156,10 @@ npx yq-workflow config prompt
 
 ## 当前主菜单会管理的工具
 
-- `Claude Code`、`Codex CLI`、`Gemini CLI`、`OpenCode`
-- `AionUi`、`MossX 客户端`、`Codex App`、`Any Code`
+- `Claude Code`、`Codex CLI`、`Gemini CLI`、`OpenCode`、`Pi`
+- `Orca`、`DSH Desktop`、`Terax`、`CLI-Manager`
 - `ccusage`、`CCR`、`CCometixLine`、`Claude HUD`
-- `cc-switch`、`Cockpit Tools`、`Cherry Studio`
+- `magpie`、`cc-switch`、`Cockpit Tools`、`Cherry Studio`
 
 ## 文档站点部署
 

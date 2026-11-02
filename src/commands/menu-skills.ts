@@ -97,7 +97,7 @@ export async function configSkills(): Promise<void> {
     else if (action === 'desktop-skills') {
       console.log()
       if (await openExternalUrl(SKILLS_MANAGE_URL)) {
-        console.log(ansis.green('  已尝试打开 Skills Manage 项目页'))
+        console.log(ansis.green('  已尝试打开 Skills Manage 官网'))
       }
       else {
         console.log(ansis.yellow(`  未能自动打开浏览器，请手动访问 ${SKILLS_MANAGE_URL}`))
